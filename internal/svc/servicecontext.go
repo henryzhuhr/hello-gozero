@@ -5,15 +5,17 @@ package svc
 
 import (
 	"context"
-	"hello-gozero/internal/config"
-	"hello-gozero/pkg/cache"
-	"hello-gozero/pkg/database"
-	"hello-gozero/pkg/queue"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/gorm"
+
+	"hello-gozero/internal/config"
+	userRepo "hello-gozero/internal/repository/user"
+	"hello-gozero/pkg/cache"
+	"hello-gozero/pkg/database"
+	"hello-gozero/pkg/queue"
 )
 
 type ServiceContext struct {
@@ -25,16 +27,28 @@ type ServiceContext struct {
 	RedisClient *redis.Client
 	KafkaWriter *kafka.Writer
 	KafkaReader *kafka.Reader
+
+	// Repository
+	Repository Repository
+}
+
+// Repository 结构体，包含所有仓库接口
+type Repository struct {
+	User userRepo.UserRepository
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
+	mysqlConn := database.MustNewMysql(c.Mysql.DataSource)
 	return &ServiceContext{
 		Logger:      logx.WithContext(context.Background()),
 		Config:      c,
-		MysqlConn:   database.MustNewMysql(c.Mysql.DataSource),
+		MysqlConn:   mysqlConn,
 		RedisClient: cache.MustNewRedis(c.Redis),
 		KafkaWriter: queue.MustNewKafkaWriter(c.Kafka),
 		KafkaReader: queue.MustNewKafkaReader(c.Kafka),
+		Repository: Repository{
+			User: userRepo.NewUserRepository(mysqlConn),
+		},
 	}
 }
 

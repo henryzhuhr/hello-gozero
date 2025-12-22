@@ -6,16 +6,16 @@ package hello
 import (
 	"net/http"
 
-	"hello-gozero/internal/logic/hello"
-	"hello-gozero/internal/svc"
-
 	"github.com/zeromicro/go-zero/rest/httpx"
+
+	helloService "hello-gozero/internal/service/hello"
+	"hello-gozero/internal/svc"
 )
 
 func HelloHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		svcCtx.Logger.Infof("hello: handler svcCtx")
-		l := hello.NewHelloLogic(r.Context(), svcCtx)
+		l := helloService.NewHelloService(r.Context(), svcCtx)
 		resp, err := l.Hello()
 		l.Logger.Infof("hello: handler调用成功")
 		if err != nil {

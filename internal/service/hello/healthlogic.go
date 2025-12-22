@@ -6,27 +6,27 @@ package hello
 import (
 	"context"
 
-	"hello-gozero/internal/svc"
-	"hello-gozero/internal/types"
-
 	"github.com/zeromicro/go-zero/core/logx"
+
+	helloDto "hello-gozero/internal/dto/hello"
+	"hello-gozero/internal/svc"
 )
 
-type HealthLogic struct {
+type HealthService struct {
 	Logger logx.Logger
 	ctx    context.Context
 	svcCtx *svc.ServiceContext
 }
 
-func NewHealthLogic(ctx context.Context, svcCtx *svc.ServiceContext) *HealthLogic {
-	return &HealthLogic{
+func NewHealthService(ctx context.Context, svcCtx *svc.ServiceContext) *HealthService {
+	return &HealthService{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
 		svcCtx: svcCtx,
 	}
 }
 
-func (l *HealthLogic) Health() (resp *types.Response, err error) {
+func (l *HealthService) Health() (resp *helloDto.Response, err error) {
 	// todo: add your logic here and delete this line
 	l.Logger.Infof("health: logic 调用成功")
 

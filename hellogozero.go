@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"hello-gozero/internal/config"
-	"hello-gozero/internal/handler"
+	"hello-gozero/internal/routes"
 	"hello-gozero/internal/svc"
 
 	"github.com/zeromicro/go-zero/core/conf"
@@ -28,7 +28,7 @@ func main() {
 
 	ctx := svc.NewServiceContext(c)
 	defer ctx.Close()
-	handler.RegisterHandlers(server, ctx)
+	routes.RegisterHandlers(server, ctx)
 
 	fmt.Printf("Starting server at %s:%d...\n", c.Host, c.Port)
 	server.Start()

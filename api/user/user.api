@@ -1,0 +1,80 @@
+syntax = "v1"
+
+// 用户信息
+type User {
+	Id            string `json:"id"`
+	Username      string `json:"username"`
+	Email         string `json:"email,omitempty"`
+	Phone         string `json:"phone,omitempty"`
+	Nickname      string `json:"nickname,omitempty"`
+	Status        int    `json:"status"`
+	LastLoginTime string `json:"lastLoginTime,omitempty"`
+}
+
+// 创建用户请求
+type CreateUserReq {
+	Username string `json:"username" validate:"required,min=3,max=50"`
+	Password string `json:"password" validate:"required,min=6,max=100"`
+	Email    string `json:"email,omitempty" validate:"omitempty,email,max=100"`
+	Phone    string `json:"phone,omitempty" validate:"omitempty,max=20"`
+	Nickname string `json:"nickname,omitempty" validate:"max=50"`
+}
+
+type CreateUserResp {
+	Id string `json:"id"`
+}
+
+// 删除用户请求
+type DeleteUserReq {
+	Id string `path:"id" validate:"required"`
+}
+
+type DeleteUserResp {
+	Message string `json:"message"`
+}
+
+// 获取用户列表请求
+type GetUserListReq {
+	Page     int    `form:"page,default=1" validate:"min=1"`
+	PageSize int    `form:"pageSize,default=10" validate:"min=1,max=100"`
+	Username string `form:"username,optional"`
+	Status   int    `form:"status,optional"`
+}
+
+type GetUserListResp {
+	Total int64  `json:"total"`
+	List  []User `json:"list"`
+}
+
+// 获取单个用户请求
+type GetUserReq {
+	Id string `path:"id" validate:"required"`
+}
+
+type GetUserResp {
+	User User `json:"user"`
+}
+
+
+@server (
+	group:  user
+	prefix: /api/v1
+    types: user
+)
+service hellogozero {
+	@doc "创建用户"
+	@handler createUser
+	post /users (CreateUserReq) returns (CreateUserResp)
+	
+	@doc "删除用户"
+	@handler deleteUser
+	delete /users/:id (DeleteUserReq) returns (DeleteUserResp)
+	
+	@doc "获取用户列表"
+	@handler getUserList
+	get /users (GetUserListReq) returns (GetUserListResp)
+	
+	@doc "获取单个用户"
+	@handler getUser
+	get /users/:id (GetUserReq) returns (GetUserResp)
+}
