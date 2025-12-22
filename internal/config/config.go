@@ -3,8 +3,18 @@
 
 package config
 
-import "github.com/zeromicro/go-zero/rest"
+import (
+	"hello-gozero/pkg/cache"
+	"hello-gozero/pkg/queue"
+
+	"github.com/zeromicro/go-zero/rest"
+)
 
 type Config struct {
 	rest.RestConf
+	Mysql struct {
+		DataSource string
+	}
+	Redis cache.RedisConfig
+	Kafka queue.KafkaConfig
 }

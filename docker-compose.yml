@@ -1,0 +1,79 @@
+# docker compose down -v
+
+# https://docs.docker.com/compose/how-tos/environment-variables/envvars/#compose_project_name
+name: hello-gozero
+
+services:
+  hello-gozero:
+    # 构建后镜像的名称和标签
+    image: hello-gozero:1.0.0 
+    # recommended to use `scripts/docker-pre-build.sh` to build the image
+    # build:
+    #   context: .
+    #   dockerfile: dockerfiles/Dockerfile
+    container_name: hello-gozero
+    networks:
+      - default
+    environment:
+      # 应用配置
+      APP_PORT: 8888
+    volumes:
+      - .:/root/hello-gozero
+    working_dir: /root/hello-gozero
+    command: ["sleep", 'infinity']
+
+  
+  mysql:
+    image: mysql:9.5 # https://hub.docker.com/_/mysql
+    restart: always
+    networks:
+      - default
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: hello_gozero_db
+    ports:
+      - "35068:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s # 等待 MySQL 启动完成
+  
+  # Redis
+  redis:
+    image: redis:8.4 # https://hub.docker.com/_/redis
+    restart: always
+    networks:
+      - default
+    # ports:
+    #   - "33308:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s # 等待 Redis 启动完成
+  
+  # Kafka
+  kafka-broker:
+    image: apache/kafka:4.1.1 # https://hub.docker.com/r/apache/kafka
+    networks:
+      - default
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+
+networks:
+  default:
+    name: hello-gozero-network
