@@ -3,8 +3,9 @@ Host: 0.0.0.0
 Port: 8888
 Timeout: 1000
 Log:
-  Level: debug
+  Level: info
   Stat: false
+  Encoding: plain
 
 # MySQL 配置
 Mysql:
@@ -15,6 +16,8 @@ Redis:
   Host: redis:6379
   Password: ""
   DB: 0
+  DefaultTTL: 300   # 默认缓存过期时间，单位秒
+  DefaultJitter: 10 # 缓存过期时间抖动，单位秒
 
 # Kafka 配置
 Kafka:

@@ -4,13 +4,17 @@ import (
 	"context"
 	"time"
 
+	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 // MustNewMysql 初始化 MySQL 连接，失败时 panic
-func MustNewMysql(dataSource string) *gorm.DB {
-	db, err := gorm.Open(mysql.Open(dataSource), &gorm.Config{})
+func MustNewMysql(dataSource string, appLogger logx.Logger) *gorm.DB {
+	gormLogger := NewGormLogger(appLogger)
+	db, err := gorm.Open(mysql.Open(dataSource), &gorm.Config{
+		Logger: gormLogger,
+	})
 	if err != nil {
 		panic(err)
 	}

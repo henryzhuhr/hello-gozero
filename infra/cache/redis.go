@@ -9,9 +9,14 @@ import (
 
 // RedisConfig Redis 配置
 type RedisConfig struct {
-	Host     string
-	Password string
-	DB       int
+	Host     string `json:"Host"`
+	Password string `json:"Password"`
+	DB       int    `json:"DB"`
+
+	// 默认缓存过期时间，单位秒
+	DefaultTTL int `json:"DefaultTTL"`
+	// 缓存过期时间抖动，单位秒
+	DefaultJitter int `json:"DefaultJitter"`
 }
 
 // MustNewRedis 初始化 Redis 连接，失败时 panic

@@ -11,7 +11,8 @@ CREATE TABLE `t_user` (
   `username` VARCHAR(50) NOT NULL COMMENT '用户名',
   `password` VARCHAR(255) NOT NULL COMMENT '加密密码',
   `email` VARCHAR(100) DEFAULT '' COMMENT '邮箱',
-  `phone` VARCHAR(20) DEFAULT '' COMMENT '手机号',
+  `phone_country_code` VARCHAR(6) NOT NULL COMMENT '手机号国际区号（例如：+86）',
+  `phone_number` VARCHAR(20) NOT NULL COMMENT '手机号',
   `nickname` VARCHAR(50) DEFAULT '' COMMENT '昵称',
   `status` TINYINT DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
   `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
@@ -23,26 +24,37 @@ CREATE TABLE `t_user` (
 -- 添加索引（如果不存在）
 CREATE UNIQUE INDEX `uk_username_deleted` ON `t_user` (`username`, `deleted_at`);
 CREATE UNIQUE INDEX `uk_email_deleted` ON `t_user` (`email`, `deleted_at`);
-CREATE UNIQUE INDEX `uk_phone_deleted` ON `t_user` (`phone`, `deleted_at`);
+CREATE UNIQUE INDEX `uk_phone_deleted` ON `t_user` (`phone_country_code`, `phone_number`, `deleted_at`);
 
 CREATE INDEX `idx_status` ON `t_user` (`status`);
 CREATE INDEX `idx_created_at` ON `t_user` (`created_at`);
 CREATE INDEX `idx_deleted_at` ON `t_user` (`deleted_at`);
 
 
--- -- 应用层生成 UUIDv7 字符串，然后插入
--- INSERT INTO `t_user` (id, username, password)
--- VALUES (
---   UUID_TO_BIN('0373b8c0-d5b6-7abc-9def-123456789abc'),  -- 注意第13位是 '7'
---   'bob',
---   '...'
--- );
-
-
--- -- 查询时还原为标准 UUID 字符串
--- SELECT BIN_TO_UUID(id) AS id, username, email FROM `t_user`;
-
--- -- 根据 UUID 字符串查询
--- SELECT BIN_TO_UUID(id) AS id, username
--- FROM `t_user`
--- WHERE id = UUID_TO_BIN('f81d4fae-7dec-11d0-a765-00a0c91e6bf6');
+INSERT INTO `t_user` (
+  `id`,
+  `username`,
+  `password`,
+  `email`,
+  `phone_country_code`,
+  `phone_number`,
+  `nickname`,
+  `status`,
+  `last_login_time`,
+  `created_at`,
+  `updated_at`,
+  `deleted_at`
+) VALUES (
+  UNHEX(REPLACE(UUID(), '-', '')),          -- UUID 转为 BINARY(16)
+  'admin',
+  '$2a$10$default_hashed_password_for_test',-- 示例密码哈希（实际应为 bcrypt/scrypt 等）
+  'admin@example.com',
+  '+86',
+  '13800138000',
+  '系统管理员',
+  1,
+  NULL,
+  NOW(),
+  NOW(),
+  NULL
+);

@@ -4,8 +4,8 @@
 package config
 
 import (
-	"hello-gozero/pkg/cache"
-	"hello-gozero/pkg/queue"
+	"hello-gozero/infra/cache"
+	"hello-gozero/infra/queue"
 
 	"github.com/zeromicro/go-zero/rest"
 )
@@ -13,8 +13,8 @@ import (
 type Config struct {
 	rest.RestConf
 	Mysql struct {
-		DataSource string
-	}
-	Redis cache.RedisConfig
-	Kafka queue.KafkaConfig
+		DataSource string `json:"DataSource"`
+	} `json:"Mysql"`
+	Redis cache.RedisConfig `json:"Redis"`
+	Kafka queue.KafkaConfig `json:"Kafka"`
 }

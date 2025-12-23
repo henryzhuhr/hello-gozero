@@ -1,15 +1,15 @@
 package user
 
+// User 用户信息，返回给客户端
 type User struct {
-	Id            string `json:"id"`
-	Username      string `json:"username"`
-	Email         string `json:"email,omitempty"`
-	Phone         string `json:"phone,omitempty"`
-	Nickname      string `json:"nickname,omitempty"`
-	Status        int    `json:"status"`
-	LastLoginTime string `json:"lastLoginTime,omitempty"`
+	Username         string `json:"username"`
+	Email            string `json:"email,omitempty"`
+	PhoneCountryCode string `json:"phone_country_code,omitempty"`
+	PhoneNumber      string `json:"phone_number,omitempty"`
+	Nickname         string `json:"nickname,omitempty"`
+	Status           int    `json:"status"`
+	LastLoginTime    string `json:"lastLoginTime,omitempty"`
 }
-
 
 type DeleteUserReq struct {
 	Id string `path:"id" validate:"required"`
@@ -29,12 +29,4 @@ type GetUserListReq struct {
 type GetUserListResp struct {
 	Total int64  `json:"total"`
 	List  []User `json:"list"`
-}
-
-type GetUserReq struct {
-	Id string `path:"id" validate:"required"`
-}
-
-type GetUserResp struct {
-	User User `json:"user"`
 }

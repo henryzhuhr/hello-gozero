@@ -9,35 +9,41 @@ import (
 	userEntity "hello-gozero/internal/entity/user"
 )
 
-// UserRepository defines the interface for user data operations
+// UserRepository 定义用户数据操作的接口
 type UserRepository interface {
-	// Create creates a new user in the database
+	// Create 创建新用户
 	Create(ctx context.Context, user *userEntity.User) error
-	// GetByID retrieves a user by ID
-	GetByID(ctx context.Context, id uuid.UUID) (*userEntity.User, error)
-	// GetByUsername retrieves a user by username
+
+	// GetByUsername 根据用户名获取用户
 	GetByUsername(ctx context.Context, username string) (*userEntity.User, error)
-	// GetByEmail retrieves a user by email
+
+	// ExistsByUsername 检查指定用户名的用户是否存在
+	ExistsByUsername(ctx context.Context, username string) (bool, error)
+
+	// GetByEmail 根据邮箱获取用户
 	GetByEmail(ctx context.Context, email string) (*userEntity.User, error)
-	// GetByPhone retrieves a user by phone number
-	GetByPhone(ctx context.Context, phone string) (*userEntity.User, error)
-	// Update updates an existing user
+
+	// GetByPhone 根据手机号获取用户
+	GetByPhone(ctx context.Context, phoneCountryCode, phoneNumber string) (*userEntity.User, error)
+
+	// ExistsByPhone 根据手机号检查用户是否存在
+	// 通常是检查，给定区号和手机号的组合是否已被注册，避免相同手机号注册多个账户
+	ExistsByPhone(ctx context.Context, phoneCountryCode, phoneNumber string) (bool, error)
+	// Update 更新已有用户
 	Update(ctx context.Context, user *userEntity.User) error
-	// UpdateFields updates specific fields of a user
-	UpdateFields(ctx context.Context, id uuid.UUID, fields map[string]interface{}) error
-	// Delete soft deletes a user by ID
+
+	// Delete 通过 ID 软删除用户
 	Delete(ctx context.Context, id uuid.UUID) error
-	// List retrieves a paginated list of users, returns users list and total count
+
+	// List 分页获取用户列表，返回用户切片和总数
 	List(ctx context.Context, offset, limit int) ([]*userEntity.User, int64, error)
-	// Exists checks if a user with the given username exists
-	Exists(ctx context.Context, username string) (bool, error)
 }
 
 type userRepositoryImpl struct {
 	db *gorm.DB
 }
 
-// NewUserRepository creates a new UserRepository instance
+// NewUserRepository 创建一个新的 UserRepository 实例
 func NewUserRepository(db *gorm.DB) UserRepository {
 	return &userRepositoryImpl{db: db}
 }
@@ -45,16 +51,6 @@ func NewUserRepository(db *gorm.DB) UserRepository {
 // Create Implements [UserRepository.Create]
 func (r *userRepositoryImpl) Create(ctx context.Context, user *userEntity.User) error {
 	return r.db.WithContext(ctx).Create(user).Error
-}
-
-// GetByID Implements [UserRepository.GetByID]
-func (r *userRepositoryImpl) GetByID(ctx context.Context, id uuid.UUID) (*userEntity.User, error) {
-	var user userEntity.User
-	err := r.db.WithContext(ctx).Where("id = ?", id[:]).First(&user).Error
-	if err != nil {
-		return nil, err
-	}
-	return &user, nil
 }
 
 // GetByUsername Implements [UserRepository.GetByUsername]
@@ -67,10 +63,20 @@ func (r *userRepositoryImpl) GetByUsername(ctx context.Context, username string)
 	return &user, nil
 }
 
+// ExistsByUsername Implements [UserRepository.ExistsByUsername]
+func (r *userRepositoryImpl) ExistsByUsername(ctx context.Context, username string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&userEntity.User{}).Where("username = ?", username).Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // GetByEmail Implements [UserRepository.GetByEmail]
 func (r *userRepositoryImpl) GetByEmail(ctx context.Context, email string) (*userEntity.User, error) {
 	var user userEntity.User
-	err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
+	err := r.db.WithContext(ctx).Where(`email = ?`, email).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -78,23 +84,33 @@ func (r *userRepositoryImpl) GetByEmail(ctx context.Context, email string) (*use
 }
 
 // GetByPhone Implements [UserRepository.GetByPhone]
-func (r *userRepositoryImpl) GetByPhone(ctx context.Context, phone string) (*userEntity.User, error) {
+func (r *userRepositoryImpl) GetByPhone(ctx context.Context, phoneCountryCode, phoneNumber string) (*userEntity.User, error) {
 	var user userEntity.User
-	err := r.db.WithContext(ctx).Where("phone = ?", phone).First(&user).Error
+	err := r.db.WithContext(ctx).
+		Where(`phone_country_code = ? AND phone_number = ?`, phoneCountryCode, phoneNumber).
+		First(&user).Error
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
 }
 
+// ExistsByPhone Implements [UserRepository.ExistsByPhone]
+func (r *userRepositoryImpl) ExistsByPhone(ctx context.Context, phoneCountryCode, phoneNumber string) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Model(&userEntity.User{}).
+		Where("phone_country_code = ? AND phone_number = ?", phoneCountryCode, phoneNumber).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // Update Implements [UserRepository.Update]
 func (r *userRepositoryImpl) Update(ctx context.Context, user *userEntity.User) error {
 	return r.db.WithContext(ctx).Save(user).Error
-}
-
-// UpdateFields Implements [UserRepository.UpdateFields]
-func (r *userRepositoryImpl) UpdateFields(ctx context.Context, id uuid.UUID, fields map[string]interface{}) error {
-	return r.db.WithContext(ctx).Model(&userEntity.User{}).Where("id = ?", id[:]).Updates(fields).Error
 }
 
 // Delete Implements [UserRepository.Delete]
@@ -118,14 +134,4 @@ func (r *userRepositoryImpl) List(ctx context.Context, offset, limit int) ([]*us
 	}
 
 	return users, total, nil
-}
-
-// Exists Implements [UserRepository.Exists]
-func (r *userRepositoryImpl) Exists(ctx context.Context, username string) (bool, error) {
-	var count int64
-	err := r.db.WithContext(ctx).Model(&userEntity.User{}).Where("username = ?", username).Count(&count).Error
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
 }

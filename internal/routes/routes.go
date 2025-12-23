@@ -27,13 +27,24 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 		rest.WithPrefix("/api/v1"),
 	)
 
+	registerV1Handlers(server, serverCtx)
+}
+
+// registerV1Handlers 注册 v1 版本的路由
+func registerV1Handlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
-				// 创建用户
+				// 注册用户
 				Method:  http.MethodPost,
-				Path:    "/user",
-				Handler: user.CreateUserHandler(serverCtx),
+				Path:    "/users/register",
+				Handler: user.RegisterUserHandler(serverCtx),
+			},
+			{
+				// 获取单个用户
+				Method:  http.MethodGet,
+				Path:    "/users/:username",
+				Handler: user.GetUserHandler(serverCtx),
 			},
 			{
 				// 获取用户列表
@@ -44,14 +55,8 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 			{
 				// 删除用户
 				Method:  http.MethodDelete,
-				Path:    "/users/:id",
+				Path:    "/users/:username",
 				Handler: user.DeleteUserHandler(serverCtx),
-			},
-			{
-				// 获取单个用户
-				Method:  http.MethodGet,
-				Path:    "/users/:id",
-				Handler: user.GetUserHandler(serverCtx),
 			},
 		},
 		rest.WithPrefix("/api/v1"),

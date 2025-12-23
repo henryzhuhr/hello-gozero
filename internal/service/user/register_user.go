@@ -1,6 +1,3 @@
-// Code scaffolded by goctl. Safe to edit.
-// goctl 1.9.2
-
 package user
 
 import (
@@ -19,27 +16,31 @@ import (
 )
 
 var (
+	// 用户名已存在
 	ErrUsernameExists = errors.New("username already exists")
+
+	// 手机号已存在
+	ErrPhoneExists = errors.New("phone already exists")
 )
 
-type CreateUserService struct {
+type RegisterUserService struct {
 	Logger logx.Logger
 	ctx    context.Context
 	svcCtx *svc.ServiceContext
 }
 
 // 创建用户
-func NewCreateUserService(ctx context.Context, svcCtx *svc.ServiceContext) *CreateUserService {
-	return &CreateUserService{
+func NewRegisterUserService(ctx context.Context, svcCtx *svc.ServiceContext) *RegisterUserService {
+	return &RegisterUserService{
 		Logger: logx.WithContext(ctx),
 		ctx:    ctx,
 		svcCtx: svcCtx,
 	}
 }
 
-func (l *CreateUserService) CreateUser(req *userDto.CreateUserReq) (resp *userDto.CreateUserResp, err error) {
-	// 1. 检查用户名是否已存在
-	exists, err := l.svcCtx.Repository.User.Exists(l.ctx, req.Username)
+func (l *RegisterUserService) RegisterUser(req *userDto.RegisterUserReq) (resp *userDto.RegisterUserResp, err error) {
+	// 检查用户名是否已存在
+	exists, err := l.svcCtx.Repository.User.ExistsByUsername(l.ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check username existence: %v", err)
 	}
@@ -47,7 +48,16 @@ func (l *CreateUserService) CreateUser(req *userDto.CreateUserReq) (resp *userDt
 		return nil, ErrUsernameExists
 	}
 
-	// 2. 检查邮箱是否已存在（如果提供）
+	// 检查手机号是否已存在，避免用户重复注册
+	exists, err = l.svcCtx.Repository.User.ExistsByPhone(l.ctx, req.PhoneCountryCode, req.PhoneNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check phone existence: %v", err)
+	}
+	if exists {
+		return nil, ErrPhoneExists
+	}
+
+	// 检查邮箱是否已存在（如果提供）
 	if req.Email != "" {
 		existingUser, err := l.svcCtx.Repository.User.GetByEmail(l.ctx, req.Email)
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -58,19 +68,7 @@ func (l *CreateUserService) CreateUser(req *userDto.CreateUserReq) (resp *userDt
 		}
 	}
 
-	// 3. 检查手机号是否已存在（如果提供）
-	if req.Phone != "" {
-		existingUser, err := l.svcCtx.Repository.User.GetByPhone(l.ctx, req.Phone)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			l.Logger.Errorf("Failed to check phone existence: %v", err)
-			return nil, errors.New("failed to check phone")
-		}
-		if existingUser != nil {
-			return nil, errors.New("phone already exists")
-		}
-	}
-
-	// 4. 加密密码
+	// 加密密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %v", err)
@@ -78,13 +76,14 @@ func (l *CreateUserService) CreateUser(req *userDto.CreateUserReq) (resp *userDt
 
 	// 5. 创建用户实体
 	user := &userEntity.User{
-		// ID: 由 [userEntity.User.BeforeCreate] hook 自动生成
-		Username: req.Username,
-		Password: string(hashedPassword),
-		Email:    req.Email,
-		Phone:    req.Phone,
-		Nickname: req.Nickname,
-		Status:   userConstant.StatusActive, // 默认正常状态
+		// ID 由 [userEntity.User.BeforeCreate] hook 自动生成，不应该显式设置
+		Username:         req.Username,
+		Password:         string(hashedPassword),
+		Email:            req.Email,
+		PhoneCountryCode: req.PhoneCountryCode,
+		PhoneNumber:      req.PhoneNumber,
+		Nickname:         req.Nickname,
+		Status:           userConstant.StatusActive, // 默认正常状态
 	}
 
 	// 6. 保存到数据库
@@ -93,7 +92,5 @@ func (l *CreateUserService) CreateUser(req *userDto.CreateUserReq) (resp *userDt
 	}
 
 	// 7. 返回结果
-	return &userDto.CreateUserResp{
-		Id: string(user.ID),
-	}, nil
+	return &userDto.RegisterUserResp{}, nil
 }

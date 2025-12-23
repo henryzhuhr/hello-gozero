@@ -14,10 +14,10 @@ import (
 	"hello-gozero/internal/svc"
 )
 
-// 创建用户
-func CreateUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
+// RegisterUserHandler 注册用户
+func RegisterUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req userDto.CreateUserReq
+		var req userDto.RegisterUserReq
 		if err := httpx.Parse(r, &req); err != nil {
 			httpx.ErrorCtx(r.Context(), w, err)
 			return
@@ -25,12 +25,19 @@ func CreateUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 		// 参数校验
 		if err := req.Validate(); err != nil {
-			httpx.ErrorCtx(r.Context(), w, err)
+			switch v := err.(type) {
+			case userDto.RegisterUserValidationError:
+				// 返回结构化的校验错误信息
+				httpx.WriteJsonCtx(r.Context(), w, http.StatusBadRequest, map[string]interface{}{"error": v.ToMap()})
+			default:
+				// 其他错误，返回通用错误信息
+				httpx.ErrorCtx(r.Context(), w, err)
+			}
 			return
 		}
 
-		l := userService.NewCreateUserService(r.Context(), svcCtx)
-		resp, err := l.CreateUser(&req)
+		l := userService.NewRegisterUserService(r.Context(), svcCtx)
+		resp, err := l.RegisterUser(&req)
 		if err != nil {
 			switch {
 			case errors.Is(err, userService.ErrUsernameExists):

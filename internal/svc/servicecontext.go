@@ -5,17 +5,18 @@ package svc
 
 import (
 	"context"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/gorm"
 
+	"hello-gozero/infra/cache"
+	"hello-gozero/infra/database"
+	"hello-gozero/infra/queue"
 	"hello-gozero/internal/config"
 	userRepo "hello-gozero/internal/repository/user"
-	"hello-gozero/pkg/cache"
-	"hello-gozero/pkg/database"
-	"hello-gozero/pkg/queue"
 )
 
 type ServiceContext struct {
@@ -34,20 +35,32 @@ type ServiceContext struct {
 
 // Repository 结构体，包含所有仓库接口
 type Repository struct {
+	// 用户仓库
 	User userRepo.UserRepository
+	// 用户仓库（带缓存的装饰器，用于特殊场景，如：防重复提交、限流）
+	CachedUser userRepo.CachedUserRepository
 }
 
 func NewServiceContext(c config.Config) *ServiceContext {
-	mysqlConn := database.MustNewMysql(c.Mysql.DataSource)
+	logger := logx.WithContext(context.Background())
+	mysqlConn := database.MustNewMysql(c.Mysql.DataSource, logger)
+	redisClient := cache.MustNewRedis(c.Redis)
+
+	// 初始化仓库
+	user := userRepo.NewUserRepository(mysqlConn)
+	RedisDefaultTTL := time.Duration(c.Redis.DefaultTTL) * time.Second
+	RedisDefaultJitter := time.Duration(c.Redis.DefaultJitter) * time.Second
+
 	return &ServiceContext{
-		Logger:      logx.WithContext(context.Background()),
+		Logger:      logger,
 		Config:      c,
 		MysqlConn:   mysqlConn,
-		RedisClient: cache.MustNewRedis(c.Redis),
+		RedisClient: redisClient,
 		KafkaWriter: queue.MustNewKafkaWriter(c.Kafka),
 		KafkaReader: queue.MustNewKafkaReader(c.Kafka),
 		Repository: Repository{
-			User: userRepo.NewUserRepository(mysqlConn),
+			User:       user,
+			CachedUser: userRepo.NewCachedUserRepository(redisClient, user, RedisDefaultTTL, RedisDefaultJitter),
 		},
 	}
 }
