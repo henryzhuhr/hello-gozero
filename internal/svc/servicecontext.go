@@ -5,9 +5,8 @@ package svc
 
 import (
 	"context"
-	"time"
+	"fmt"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/gorm"
@@ -20,14 +19,13 @@ import (
 )
 
 type ServiceContext struct {
+	// 全局配置
+	Config config.Config
 	// 全局日志
 	Logger logx.Logger
-	Config config.Config
 
-	MysqlConn   *gorm.DB
-	RedisClient *redis.Client
-	KafkaWriter *kafka.Writer
-	KafkaReader *kafka.Reader
+	// Infra
+	Infra Infra
 
 	// Repository
 	Repository Repository
@@ -41,43 +39,73 @@ type Repository struct {
 	CachedUser userRepo.CachedUserRepository
 }
 
-func NewServiceContext(c config.Config) *ServiceContext {
-	logger := logx.WithContext(context.Background())
-	mysqlConn := database.MustNewMysql(c.Mysql.DataSource, logger)
-	redisClient := cache.MustNewRedis(c.Redis)
+// Infra 结构体，包含所有基础设施连接
+type Infra struct {
+	// 数据库连接
+	MysqlConn *gorm.DB
+
+	// Redis 基础设施封装
+	Redis *cache.RedisInfra
+
+	// Kafka 生产者
+	KafkaWriter *kafka.Writer
+	// Kafka 消费者
+	KafkaReader *kafka.Reader
+}
+
+// NewServiceContext 创建全局服务上下文实例。
+// 返回错误时，调用方应处理该错误（如记录日志并退出程序）
+func NewServiceContext(c config.Config) (*ServiceContext, error) {
+	ctx := context.Background()
+	// 初始化日志
+	logger := logx.WithContext(ctx)
+
+	// 初始化 MySQL 连接
+	mysqlConn := database.MustNewMysql(c.Infra.Mysql, logger)
+
+	// 初始化 Redis 客户端
+	redisInfra, err := cache.NewRedisInfra(ctx, c.Infra.Redis)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init redis: %w", err)
+	}
+
+	// 初始化 Kafka 读写器
+	kafkaWriter := queue.MustNewKafkaWriter(c.Infra.Kafka)
+	kafkaReader := queue.MustNewKafkaReader(c.Infra.Kafka)
 
 	// 初始化仓库
 	user := userRepo.NewUserRepository(mysqlConn)
-	RedisDefaultTTL := time.Duration(c.Redis.DefaultTTL) * time.Second
-	RedisDefaultJitter := time.Duration(c.Redis.DefaultJitter) * time.Second
+	cachedUser := userRepo.NewCachedUserRepository(redisInfra, user)
 
 	return &ServiceContext{
-		Logger:      logger,
-		Config:      c,
-		MysqlConn:   mysqlConn,
-		RedisClient: redisClient,
-		KafkaWriter: queue.MustNewKafkaWriter(c.Kafka),
-		KafkaReader: queue.MustNewKafkaReader(c.Kafka),
+		Config: c,
+		Logger: logger,
+		Infra: Infra{
+			MysqlConn:   mysqlConn,
+			Redis:       redisInfra,
+			KafkaWriter: kafkaWriter,
+			KafkaReader: kafkaReader,
+		},
 		Repository: Repository{
 			User:       user,
-			CachedUser: userRepo.NewCachedUserRepository(redisClient, user, RedisDefaultTTL, RedisDefaultJitter),
+			CachedUser: cachedUser,
 		},
-	}
+	}, nil
 }
 
 // Close 关闭所有资源连接
 func (sc *ServiceContext) Close() error {
-	if err := database.CloseMysql(sc.MysqlConn); err != nil {
-		logx.Errorf("Failed to close MySQL: %v", err)
+	if err := database.CloseMysql(sc.Infra.MysqlConn); err != nil {
+		return fmt.Errorf("failed to close MySQL: %v", err)
 	}
-	if err := cache.CloseRedis(sc.RedisClient); err != nil {
-		logx.Errorf("Failed to close Redis: %v", err)
+	if err := sc.Infra.Redis.Close(); err != nil {
+		return fmt.Errorf("failed to close Redis: %v", err)
 	}
-	if err := queue.CloseKafkaWriter(sc.KafkaWriter); err != nil {
-		logx.Errorf("Failed to close Kafka writer: %v", err)
+	if err := queue.CloseKafkaWriter(sc.Infra.KafkaWriter); err != nil {
+		return fmt.Errorf("failed to close Kafka writer: %v", err)
 	}
-	if err := queue.CloseKafkaReader(sc.KafkaReader); err != nil {
-		logx.Errorf("Failed to close Kafka reader: %v", err)
+	if err := queue.CloseKafkaReader(sc.Infra.KafkaReader); err != nil {
+		return fmt.Errorf("failed to close Kafka reader: %v", err)
 	}
 	return nil
 }

@@ -26,7 +26,11 @@ func main() {
 	server := rest.MustNewServer(c.RestConf)
 	defer server.Stop()
 
-	ctx := svc.NewServiceContext(c)
+	ctx, err := svc.NewServiceContext(c)
+	if err != nil {
+		fmt.Printf("failed to create service context: %v\n", err)
+		return
+	}
 	defer ctx.Close()
 	routes.RegisterHandlers(server, ctx)
 

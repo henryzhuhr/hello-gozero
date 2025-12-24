@@ -5,23 +5,41 @@ Timeout: 1000
 Log:
   Level: info
   Stat: false
-  Encoding: plain
+  Encoding: plain # plain 或 json
 
-# MySQL 配置
-Mysql:
-  DataSource: root:rootpassword@tcp(mysql:3306)/hello_gozero_db?charset=utf8mb4&parseTime=True&loc=Local
+# 基础设施配置
+Infra:
+  # MySQL 配置
+  Mysql:
+    Host: mysql
+    Port: 3306
+    User: root
+    Password: rootpassword
+    DB: hello_gozero_db
+    MaxOpenConns: 100
+    MaxIdleConns: 10
+    ConnMaxLifetime: 300 # 连接最大生命周期，单位秒
+    ConnMaxIdleTime: 100 # 连接最大空闲时间，单位秒
 
-# Redis 配置
-Redis:
-  Host: redis:6379
-  Password: ""
-  DB: 0
-  DefaultTTL: 300   # 默认缓存过期时间，单位秒
-  DefaultJitter: 10 # 缓存过期时间抖动，单位秒
 
-# Kafka 配置
-Kafka:
-  Brokers:
-    - kafka-broker:9092
-  Topic: hello-gozero-topic
-  Group: hello-gozero-group
+  # Redis 配置
+  Redis:
+    Addr: redis:6379
+    Password: ""
+    DB: 0
+    UseTLS: false
+    InsecureSkipVerify: false
+    DialTimeout: 3 # 建立连接超时时间，单位秒
+    ReadTimeout: 3 # 读取数据超时时间，单位秒
+    WriteTimeout: 3 # 写入数据超时时间，单位秒
+    PoolSize: 10  # 连接池大小
+    DefaultTTL: 300   # 默认缓存过期时间，单位秒
+    DefaultJitter: 10 # 缓存过期时间抖动，单位秒
+    
+
+  # Kafka 配置
+  Kafka:
+    Brokers:
+      - kafka-broker:9092
+    Topic: hello-gozero-topic
+    Group: hello-gozero-group

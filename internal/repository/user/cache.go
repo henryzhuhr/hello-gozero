@@ -11,7 +11,6 @@ import (
 	"hello-gozero/infra/cache"
 	userEntity "hello-gozero/internal/entity/user"
 
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 )
@@ -33,16 +32,13 @@ type CachedUserRepository interface {
 
 // CachedUserRepositoryImpl Implements [CachedUserRepository]
 type CachedUserRepositoryImpl struct {
-	// Redis 客户端
-	client *redis.Client
+	// Redis 客户端封装
+	redisInfra *cache.RedisInfra
 
 	// 包装底层 DB repo
 	repo UserRepository
 
 	group singleflight.Group // ← 新增
-
-	ttl    time.Duration
-	jitter time.Duration
 }
 
 // NewCachedUserRepository
@@ -52,12 +48,10 @@ type CachedUserRepositoryImpl struct {
 //   - repo: 底层 UserRepository 实例
 //   - ttl: 缓存默认过期时间
 //   - jitter: 缓存过期时间抖动，防止缓存雪崩
-func NewCachedUserRepository(client *redis.Client, repo UserRepository, ttl time.Duration, jitter time.Duration) CachedUserRepository {
+func NewCachedUserRepository(redisInfra *cache.RedisInfra, repo UserRepository) CachedUserRepository {
 	return &CachedUserRepositoryImpl{
-		client: client,
-		repo:   repo,
-		ttl:    ttl,
-		jitter: jitter,
+		redisInfra: redisInfra,
+		repo:       repo,
 	}
 }
 
@@ -74,7 +68,7 @@ func NewCachedUserRepository(client *redis.Client, repo UserRepository, ttl time
 func (c *CachedUserRepositoryImpl) GetByUsername(ctx context.Context, username string) (*userEntity.User, error) {
 	// 尝试从缓存中读取数据
 	key := cacheKeyPrefix + ":" + username
-	val, err := c.client.Get(ctx, key).Bytes()
+	val, err := c.redisInfra.Client.Get(ctx, key).Bytes()
 	if err == nil {
 		// 检查是否是空值标记
 		if string(val) == cachedEmptyValue {
@@ -165,19 +159,19 @@ func (c *CachedUserRepositoryImpl) SetByUsername(ctx context.Context, user *user
 	// 大量 key 在同一时间过期（如服务重启后批量加载缓存，TTL 相同）。
 	// 缓存集体失效 → 所有请求打到数据库 → DB 连接池耗尽、CPU 打满。
 	// 方案：随机 TTL（TTL jitter），缓存过期时间均匀分布，避免集体失效。
-	return c.client.Set(ctx, key, buf.Bytes(), cache.RandomTTL(c.ttl, c.jitter)).Err()
+	return c.redisInfra.Client.Set(ctx, key, buf.Bytes(), cache.RandomTTL(c.redisInfra.DefaultTTL, c.redisInfra.DefaultJitter)).Err()
 }
 
 // setEmptyUserCache 缓存一个“空用户”标记，防止缓存穿透
 func (c *CachedUserRepositoryImpl) setEmptyUserCache(ctx context.Context, username string, ttl time.Duration) error {
 	key := c.getCachedKey(username)
 	// 方式 1：存一个特殊字符串
-	return c.client.Set(ctx, key, cachedEmptyValue, ttl).Err()
+	return c.redisInfra.Client.Set(ctx, key, cachedEmptyValue, ttl).Err()
 
 	// 方式 2：存一个 gob 编码的 nil 或空结构（需 Get 时兼容）
 	// var buf bytes.Buffer
 	// gob.NewEncoder(&buf).Encode((*userEntity.User)(nil))
-	// return c.client.Set(ctx, key, buf.Bytes(), ttl).Err()
+	// return c.redisInfra.Client.Set(ctx, key, buf.Bytes(), ttl).Err()
 }
 
 func (c *CachedUserRepositoryImpl) getCachedKey(username string) string {
