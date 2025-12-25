@@ -20,7 +20,7 @@ type GormLogger struct {
 
 func NewGormLogger(l logx.Logger) *GormLogger {
 	return &GormLogger{
-		logger:  l,
+		logger:  l,           // 因为封装了一层，所以跳过一层调用栈
 		level:   logger.Warn, // or logger.Info if you want to log all SQL
 		slowSQL: 200 * time.Millisecond,
 	}
@@ -58,7 +58,7 @@ func (l *GormLogger) Error(ctx context.Context, format string, args ...interface
 
 // Trace logs SQL with source, duration, etc.
 // It implements GORM's Trace method [gorm.io/gorm/logger.Interface].
-func (l *GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+func (l *GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
 	if l.level <= logger.Silent {
 		return
 	}

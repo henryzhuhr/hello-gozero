@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"hello-gozero/infra/cache"
+	"hello-gozero/internal/constant/infra"
 	userEntity "hello-gozero/internal/entity/user"
 
 	"golang.org/x/sync/singleflight"
@@ -19,15 +20,26 @@ const (
 	cacheKeyPrefix   = "user:info"
 	cacheEmptyTTL    = 60 * time.Second // 缓存空对象的 TTL
 	cachedEmptyValue = "null"           // 缓存空对象的特殊标记
+
+	dataSourceCache    = "cache"
+	dataSourceDatabase = "database"
 )
+
+type CachedUserEntity struct {
+	User *userEntity.User
+
+	// 标记查询的数据源
+	// [infra.DataSourceCache] or [infra.DataSourceDatabase]
+	DataSource string
+}
 
 // CachedUserRepository 定义用户缓存接口
 type CachedUserRepository interface {
-	// GetByUsername 从缓存获取用户
-	GetByUsername(ctx context.Context, username string) (*userEntity.User, error)
+	// GetByUsername 从缓存获取用户，如果未命中则回源数据库
+	GetByUsername(ctx context.Context, username string) (*CachedUserEntity, error)
 
 	// SetByUsername 将用户信息写入缓存
-	SetByUsername(ctx context.Context, user *userEntity.User) error
+	SetByUsername(ctx context.Context, user *CachedUserEntity) error
 }
 
 // CachedUserRepositoryImpl Implements [CachedUserRepository]
@@ -65,7 +77,7 @@ func NewCachedUserRepository(redisInfra *cache.RedisInfra, repo UserRepository) 
 // gob 是 Go 标准库提供的二进制编码格式，专为 Go 设计。
 // 项目是纯 Go 服务（无其他语言读缓存），不存在多语言系统（Go + Python/Java），所以选择 gob。
 // 如果需要跨语言支持，建议使用 JSON、MessagePack、Protobuf 等通用格式。
-func (c *CachedUserRepositoryImpl) GetByUsername(ctx context.Context, username string) (*userEntity.User, error) {
+func (c *CachedUserRepositoryImpl) GetByUsername(ctx context.Context, username string) (*CachedUserEntity, error) {
 	// 尝试从缓存中读取数据
 	key := cacheKeyPrefix + ":" + username
 	val, err := c.redisInfra.Client.Get(ctx, key).Bytes()
@@ -79,8 +91,11 @@ func (c *CachedUserRepositoryImpl) GetByUsername(ctx context.Context, username s
 		var user userEntity.User
 		buf := bytes.NewBuffer(val)
 		if err := gob.NewDecoder(buf).Decode(&user); err == nil {
-			// 反序列化成功，直接返回缓存中的用户
-			return &user, nil
+			// 反序列化成功，直接返回缓存中的用户（标记数据来源为缓存）
+			return &CachedUserEntity{
+				User:       &user,
+				DataSource: infra.DataSourceCache,
+			}, nil
 		}
 		// 反序列化失败（如缓存数据损坏或结构变更），继续回源查询
 	}
@@ -129,30 +144,33 @@ func (c *CachedUserRepositoryImpl) GetByUsername(ctx context.Context, username s
 	// Write back to cache
 	// 查询成功，将用户数据写入缓存（用于后续请求加速）
 	// 注意：这里忽略写缓存的错误，避免因缓存故障影响主业务流程
-	_ = c.SetByUsername(ctx, user)
+	cachedEntity := &CachedUserEntity{
+		User:       user,
+		DataSource: infra.DataSourceDatabase,
+	}
+	_ = c.SetByUsername(ctx, cachedEntity)
 
-	return user, nil
+	return cachedEntity, nil
 }
 
 // SetByUsername Implements [CachedUserRepository.SetByUsername]
 // 使用 gob 编码以支持任意 Go 结构体（包括非导出字段），但要求接收方结构一致。
 // 若 user 为 nil，则跳过写入（避免缓存空对象，除非你明确需要空值缓存）。
 // 缓存有效期由 cacheTTL 全局控制。
-func (c *CachedUserRepositoryImpl) SetByUsername(ctx context.Context, user *userEntity.User) error {
-	if user == nil {
+func (c *CachedUserRepositoryImpl) SetByUsername(ctx context.Context, cachedEntity *CachedUserEntity) error {
+	if cachedEntity == nil || cachedEntity.User == nil {
 		// 不缓存 nil 值，防止缓存穿透（除非业务需要空值缓存）
 		return nil
 	}
 
-	// 使用 gob 将 user 序列化为字节流
-
+	// 使用 gob 将 user 序列化为字节流（只缓存 User 对象，不缓存 DataSource 标记）
 	var buf bytes.Buffer
-	if err := gob.NewEncoder(&buf).Encode(user); err != nil {
+	if err := gob.NewEncoder(&buf).Encode(cachedEntity.User); err != nil {
 		// 序列化失败，返回错误（通常因结构包含不可 gob 编码的类型）
 		return err
 	}
 
-	key := c.getCachedKey(user.Username)
+	key := c.getCachedKey(cachedEntity.User.Username)
 	// 写入 Redis，设置过期时间（cacheTTL）
 	// 	二、缓存雪崩（Cache Avalanche）
 	// 🔍 问题表现

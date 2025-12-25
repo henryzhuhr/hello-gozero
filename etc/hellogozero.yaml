@@ -3,7 +3,7 @@ Host: 0.0.0.0
 Port: 8888
 Timeout: 1000
 Log:
-  Level: info
+  Level: debug
   Stat: false
   Encoding: plain # plain 或 json
 

@@ -22,11 +22,12 @@ func GetUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 		l := userService.NewGetUserService(r.Context(), svcCtx)
 		resp, err := l.GetUser(&req)
+		ctx := l.GetCtx()
 		if err != nil {
-			l.Logger.WithContext(r.Context()).Errorf("failed to get user: %v", err)
-			httpx.ErrorCtx(r.Context(), w, err)
+			l.Logger.WithContext(ctx).Errorf("failed to get user: %v", err)
+			httpx.ErrorCtx(ctx, w, err)
 		} else {
-			httpx.OkJsonCtx(r.Context(), w, resp)
+			httpx.OkJsonCtx(ctx, w, resp)
 		}
 	}
 }

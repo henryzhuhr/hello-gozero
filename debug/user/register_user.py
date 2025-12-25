@@ -42,6 +42,7 @@ def main():
         # user.email="adasdmi1212n"
         create_user_request(user)
         get_user(user.username)
+        get_user(user.username)  # 这次查询触发缓存查询
 
 
 def create_user_request(user: User):

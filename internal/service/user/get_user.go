@@ -29,20 +29,30 @@ func NewGetUserService(ctx context.Context, svcCtx *svc.ServiceContext) *GetUser
 		svcCtx: svcCtx,
 	}
 }
+func (l *GetUserService) GetCtx() context.Context {
+	return l.ctx
+}
 
 func (l *GetUserService) GetUser(req *userDto.GetUserReq) (resp *userDto.GetUserResp, err error) {
 	if req == nil || req.Username == "" {
 		return nil, fmt.Errorf("missing username")
 	}
 
-	user, err := l.svcCtx.Repository.CachedUser.GetByUsername(l.ctx, req.Username)
+	cachedEntity, err := l.svcCtx.Repository.CachedUser.GetByUsername(l.ctx, req.Username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %v", err)
 	}
+	l.ctx = logx.ContextWithFields(l.ctx, logx.Field("source", cachedEntity.DataSource))
+	l.Logger.WithContext(l.ctx).Debugf("GetUser: fetched user '%s' from %s", req.Username, cachedEntity.DataSource)
+	if cachedEntity.User == nil {
+		// 用户不存在
+		return nil, nil
+	}
 
-	return l.userEntityToResp(user), nil
+	return l.userEntityToResp(cachedEntity.User), nil
 }
 
+// userEntityToResp 将用户实体转换为响应 DTO
 func (l *GetUserService) userEntityToResp(user *userEntity.User) *userDto.GetUserResp {
 	var lastLogin string
 	if user.LastLoginTime != nil {
