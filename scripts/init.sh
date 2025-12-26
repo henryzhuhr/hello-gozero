@@ -24,5 +24,5 @@ go mod tidy
 uv sync #--active
 
 
-echo ": $(date +%s):0;uv run debug/navs/test_navs_v3.py" >> "$HOME"/.zsh_history
-echo ": $(date +%s):0;go run app/portal/service/api/portal.go" >> "$HOME"/.zsh_history
+echo ": $(date +%s):0;uv run debug/health.py" >> "$HOME"/.zsh_history
+echo ": $(date +%s):0;go run app/main.go" >> "$HOME"/.zsh_history

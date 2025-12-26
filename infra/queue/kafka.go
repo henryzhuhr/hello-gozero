@@ -1,3 +1,4 @@
+// Package queue provides Kafka producer and consumer initialization.
 package queue
 
 import (
@@ -37,6 +38,7 @@ func MustNewKafkaWriter(conf KafkaConfig) *kafka.Writer {
 	if err := writer.WriteMessages(ctx, testMsg); err != nil {
 		// 如果 topic 不存在，忽略这个错误（在生产环境中不应该忽略）
 		// panic(err)
+		_ = err // 显式忽略错误
 	}
 
 	return writer
@@ -48,9 +50,9 @@ func MustNewKafkaReader(conf KafkaConfig) *kafka.Reader {
 		Brokers:        conf.Brokers,
 		Topic:          conf.Topic,
 		GroupID:        conf.Group,
-		MinBytes:       10e3,            // 10KB
-		MaxBytes:       10e6,            // 10MB
-		CommitInterval: time.Second,     // 每秒提交一次 offset
+		MinBytes:       10e3,             // 10KB
+		MaxBytes:       10e6,             // 10MB
+		CommitInterval: time.Second,      // 每秒提交一次 offset
 		StartOffset:    kafka.LastOffset, // 从最新消息开始消费
 	})
 

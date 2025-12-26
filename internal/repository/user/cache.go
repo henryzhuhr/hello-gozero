@@ -34,6 +34,7 @@ type CachedUserEntity struct {
 }
 
 // CachedUserRepository 定义用户缓存接口
+// 带缓存的装饰器，用于特殊场景，如：防重复提交、限流
 type CachedUserRepository interface {
 	// GetByUsername 从缓存获取用户，如果未命中则回源数据库
 	GetByUsername(ctx context.Context, username string) (*CachedUserEntity, error)

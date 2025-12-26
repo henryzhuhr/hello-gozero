@@ -1,6 +1,4 @@
-// Code scaffolded by goctl. Safe to edit.
-// goctl 1.9.2
-
+// Package svc provides service context and dependency injection for the application.
 package svc
 
 import (
@@ -24,7 +22,7 @@ type ServiceContext struct {
 	// 全局日志
 	Logger logx.Logger
 
-	// Infra
+	// Infra 基础设施配置
 	Infra Infra
 
 	// Repository

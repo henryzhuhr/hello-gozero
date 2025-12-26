@@ -10,7 +10,7 @@ import (
 	"hello-gozero/internal/svc"
 )
 
-// 获取单个用户
+// GetUserHandler 获取单个用户
 func GetUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req userDto.GetUserReq

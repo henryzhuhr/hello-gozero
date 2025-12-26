@@ -1,4 +1,0 @@
-syntax = "v1"
-
-import "hello/hello.api"
-import "./user/user.api"

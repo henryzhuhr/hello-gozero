@@ -3,6 +3,7 @@ module hello-gozero
 go 1.25.0
 
 require (
+	github.com/avast/retry-go/v4 v4.7.0
 	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/segmentio/kafka-go v0.4.49
@@ -15,7 +16,6 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/avast/retry-go/v4 v4.7.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

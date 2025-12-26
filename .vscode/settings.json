@@ -1,0 +1,5 @@
+{
+  "gopls": {
+    "formatting.local": "hello-gozero"  // ← 替换为你的 module 名（go.mod 中的 module 路径）
+  }
+}
