@@ -45,15 +45,26 @@ func MustNewKafkaWriter(conf KafkaConfig) *kafka.Writer {
 }
 
 // MustNewKafkaReader 初始化 Kafka 消费者，失败时 panic
+//
+// 分布式消费说明：
+// 1. 使用 Consumer Group（GroupID）确保同一组内的多个消费者不会重复消费
+// 2. Kafka 会自动将 Topic 的分区分配给组内的不同消费者
+// 3. 当消费者数量变化时，Kafka 会触发 Rebalance 重新分配分区
+// 4. 建议 Topic 分区数 >= 服务副本数，以实现最佳并行度
+//
+// 注意事项：
+// - 确保所有服务副本使用相同的 GroupID
+// - 消息处理必须是幂等的，因为在极端情况下（如 Rebalance）可能会重复消费
+// - StartOffset 设置为 LastOffset，新消费者只消费新消息，不处理历史消息
 func MustNewKafkaReader(conf KafkaConfig) *kafka.Reader {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        conf.Brokers,
 		Topic:          conf.Topic,
-		GroupID:        conf.Group,
+		GroupID:        conf.Group,       // Consumer Group ID - 确保所有副本使用相同的值
 		MinBytes:       10e3,             // 10KB
 		MaxBytes:       10e6,             // 10MB
 		CommitInterval: time.Second,      // 每秒提交一次 offset
-		StartOffset:    kafka.LastOffset, // 从最新消息开始消费
+		StartOffset:    kafka.LastOffset, // 从最新消息开始消费（新 Group 时）
 	})
 
 	// 测试连接（尝试读取一条消息，超时即可）

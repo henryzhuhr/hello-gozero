@@ -1,3 +1,4 @@
+// Package user provides repository implementations for user data operations.
 package user
 
 import (
@@ -11,6 +12,31 @@ import (
 
 // UserRepository 定义用户数据操作的接口
 type UserRepository interface {
+	// Transaction 执行事务操作
+	// 接受一个函数，该函数接收事务版本的 Repository 并执行业务逻辑
+	// 如果函数返回 error，事务回滚；否则提交
+	//
+	// 示例：
+	//   err := userRepo.Transaction(ctx, func(txRepo UserRepository) error {
+	//       // 检查用户是否存在
+	//       exists, err := txRepo.ExistsByUsername(ctx, "alice")
+	//       if err != nil {
+	//           return err // 自动回滚
+	//       }
+	//       if exists {
+	//           return ErrUsernameExists // 自动回滚
+	//       }
+	//
+	//       // 创建用户
+	//       user := &User{Username: "alice"}
+	//       if err := txRepo.Create(ctx, user); err != nil {
+	//           return err // 自动回滚
+	//       }
+	//
+	//       return nil // 自动提交
+	//   })
+	Transaction(ctx context.Context, fn func(repo UserRepository) error) error
+
 	// Create 创建新用户
 	Create(ctx context.Context, user *userEntity.User) error
 
@@ -29,6 +55,7 @@ type UserRepository interface {
 	// ExistsByPhone 根据手机号检查用户是否存在
 	// 通常是检查，给定区号和手机号的组合是否已被注册，避免相同手机号注册多个账户
 	ExistsByPhone(ctx context.Context, phoneCountryCode, phoneNumber string) (bool, error)
+
 	// Update 更新已有用户
 	Update(ctx context.Context, user *userEntity.User) error
 
@@ -46,6 +73,14 @@ type userRepositoryImpl struct {
 // NewUserRepository 创建一个新的 UserRepository 实例
 func NewUserRepository(db *gorm.DB) UserRepository {
 	return &userRepositoryImpl{db: db}
+}
+
+// Transaction Implements [UserRepository.Transaction]
+func (r *userRepositoryImpl) Transaction(ctx context.Context, fn func(repo UserRepository) error) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txRepo := &userRepositoryImpl{db: tx} // 直接构造一个带事务的实例
+		return fn(txRepo)
+	})
 }
 
 // Create Implements [UserRepository.Create]

@@ -68,11 +68,18 @@ func (w *KafkaConsumerWorker) Start(ctx context.Context) error {
 			}
 
 			// 处理消息
+			// 注意：在分布式环境下，虽然使用了 Consumer Group 避免正常情况下的重复消费，
+			// 但在以下情况仍可能重复消费：
+			// 1. Consumer Rebalance 期间
+			// 2. 消息处理完成但 offset 提交失败
+			// 3. Consumer 崩溃重启
+			// 因此，业务处理必须设计为幂等操作
 			if err := w.processMessage(ctx, message); err != nil {
 				w.logger.Errorf("Failed to process message: %v, offset: %d, partition: %d",
 					err, message.Offset, message.Partition)
 				// 根据业务需求决定是否提交 offset
 				// 这里选择提交，避免重复消费导致堆积
+				// 如果需要严格的 at-least-once 语义，可以不提交让消息重试
 			}
 
 			// 提交 offset

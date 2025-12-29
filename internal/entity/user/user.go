@@ -1,3 +1,4 @@
+// Package user defines the user entity and related database models.
 package user
 
 import (
