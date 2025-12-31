@@ -11,12 +11,13 @@ type User struct {
 	LastLoginTime    string `json:"lastLoginTime,omitempty"`
 }
 
+// DeleteUserReq 删除用户请求参数
 type DeleteUserReq struct {
-	Id string `path:"id" validate:"required"`
+	Username string `path:"username" validate:"required"`
 }
 
+// DeleteUserResp 删除用户响应参数
 type DeleteUserResp struct {
-	Message string `json:"message"`
 }
 
 type GetUserListReq struct {

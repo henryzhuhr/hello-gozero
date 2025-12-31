@@ -59,7 +59,10 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	logger := logx.WithContext(ctx)
 
 	// 初始化 MySQL 连接
-	mysqlConn := database.MustNewMysql(c.Infra.Mysql, logger)
+	mysqlConn, err := database.NewMySQL(c.Infra.Mysql, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init mysql: %w", err)
+	}
 
 	// 初始化 Redis 客户端
 	redisInfra, err := cache.NewRedisInfra(ctx, c.Infra.Redis)
@@ -68,8 +71,14 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	}
 
 	// 初始化 Kafka 读写器
-	kafkaWriter := queue.MustNewKafkaWriter(c.Infra.Kafka)
-	kafkaReader := queue.MustNewKafkaReader(c.Infra.Kafka)
+	kafkaWriter, err := queue.NewKafkaWriter(c.Infra.Kafka)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init kafka writer: %w", err)
+	}
+	kafkaReader, err := queue.NewKafkaReader(c.Infra.Kafka)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init kafka reader: %w", err)
+	}
 
 	// 初始化仓库
 	user := userRepo.NewUserRepository(mysqlConn)

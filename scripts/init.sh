@@ -26,3 +26,4 @@ uv sync #--active
 
 echo ": $(date +%s):0;uv run debug/health.py" >> "$HOME"/.zsh_history
 echo ": $(date +%s):0;go run app/main.go" >> "$HOME"/.zsh_history
+echo ": $(date +%s):0;pytest -v -s" >> "$HOME"/.zsh_history

@@ -18,7 +18,7 @@ type GetUserListService struct {
 	svcCtx *svc.ServiceContext
 }
 
-// 获取用户列表
+// NewGetUserListService 获取用户列表
 func NewGetUserListService(ctx context.Context, svcCtx *svc.ServiceContext) *GetUserListService {
 	return &GetUserListService{
 		Logger: logx.WithContext(ctx),
@@ -26,7 +26,9 @@ func NewGetUserListService(ctx context.Context, svcCtx *svc.ServiceContext) *Get
 		svcCtx: svcCtx,
 	}
 }
-
+func (l *GetUserListService) GetCtx() context.Context {
+	return l.ctx
+}
 func (l *GetUserListService) GetUserList(req *userDto.GetUserListReq) (resp *userDto.GetUserListResp, err error) {
 	// todo: add your logic here and delete this line
 

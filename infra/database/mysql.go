@@ -40,8 +40,8 @@ type MysqlConfig struct {
 	ConnMaxIdleTime int `json:"ConnMaxIdleTime"`
 }
 
-// MustNewMysql 初始化 MySQL 连接，失败时 panic
-func MustNewMysql(config MysqlConfig, appLogger logx.Logger) *gorm.DB {
+// NewMySQL 初始化 MySQL 连接
+func NewMySQL(config MysqlConfig, appLogger logx.Logger) (*gorm.DB ,error){
 	// 初始化 Gorm 日志，接管 go-zero 日志
 	gormLogger := NewGormLogger(appLogger)
 
@@ -56,13 +56,13 @@ func MustNewMysql(config MysqlConfig, appLogger logx.Logger) *gorm.DB {
 		Logger: gormLogger,
 	})
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to open gorm DB: %w", err)
 	}
 
 	// 获取底层 SQL DB 实例
 	sqlDB, err := db.DB()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to get sql DB from gorm DB: %w", err)
 	}
 
 	// 测试连接
@@ -70,7 +70,7 @@ func MustNewMysql(config MysqlConfig, appLogger logx.Logger) *gorm.DB {
 	defer cancel()
 
 	if err := sqlDB.PingContext(ctx); err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to ping sql DB: %w", err)
 	}
 
 	// 配置连接池
@@ -79,7 +79,7 @@ func MustNewMysql(config MysqlConfig, appLogger logx.Logger) *gorm.DB {
 	sqlDB.SetConnMaxLifetime(time.Duration(config.ConnMaxLifetime) * time.Second)
 	sqlDB.SetConnMaxIdleTime(time.Duration(config.ConnMaxIdleTime) * time.Second)
 
-	return db
+	return db, nil
 }
 
 // CloseMysql 关闭 MySQL 连接

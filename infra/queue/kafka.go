@@ -15,8 +15,8 @@ type KafkaConfig struct {
 	Group   string // Consumer Group ID
 }
 
-// MustNewKafkaWriter 初始化 Kafka 生产者，失败时 panic
-func MustNewKafkaWriter(conf KafkaConfig) *kafka.Writer {
+// NewKafkaWriter 初始化 Kafka 生产者
+func NewKafkaWriter(conf KafkaConfig) (*kafka.Writer, error) {
 	writer := &kafka.Writer{
 		Addr:         kafka.TCP(conf.Brokers...),
 		Topic:        conf.Topic,
@@ -41,10 +41,10 @@ func MustNewKafkaWriter(conf KafkaConfig) *kafka.Writer {
 		_ = err // 显式忽略错误
 	}
 
-	return writer
+	return writer, nil
 }
 
-// MustNewKafkaReader 初始化 Kafka 消费者，失败时 panic
+// NewKafkaReader 初始化 Kafka 消费者
 //
 // 分布式消费说明：
 // 1. 使用 Consumer Group（GroupID）确保同一组内的多个消费者不会重复消费
@@ -56,7 +56,7 @@ func MustNewKafkaWriter(conf KafkaConfig) *kafka.Writer {
 // - 确保所有服务副本使用相同的 GroupID
 // - 消息处理必须是幂等的，因为在极端情况下（如 Rebalance）可能会重复消费
 // - StartOffset 设置为 LastOffset，新消费者只消费新消息，不处理历史消息
-func MustNewKafkaReader(conf KafkaConfig) *kafka.Reader {
+func NewKafkaReader(conf KafkaConfig) (*kafka.Reader, error) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:        conf.Brokers,
 		Topic:          conf.Topic,
@@ -74,7 +74,7 @@ func MustNewKafkaReader(conf KafkaConfig) *kafka.Reader {
 	_, _ = reader.FetchMessage(ctx)
 	// 即使读取失败也不 panic，因为可能是 topic 为空或连接超时
 
-	return reader
+	return reader, nil
 }
 
 // CloseKafkaWriter 关闭 Kafka 生产者

@@ -11,9 +11,16 @@ import (
 )
 
 func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
+	registerGlobalHandlers(server, serverCtx)
+	registerV1Handlers(server, serverCtx)
+}
+
+// registerGlobalHandlers 注册全局路由
+func registerGlobalHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
+				// 健康检查
 				Method:  http.MethodGet,
 				Path:    "/health",
 				Handler: hello.HealthHandler(serverCtx),
@@ -24,10 +31,8 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 				Handler: hello.HelloHandler(serverCtx),
 			},
 		},
-		rest.WithPrefix("/api/v1"),
+		rest.WithPrefix("/api"),
 	)
-
-	registerV1Handlers(server, serverCtx)
 }
 
 // registerV1Handlers 注册 v1 版本的路由

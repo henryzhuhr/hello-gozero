@@ -39,7 +39,9 @@ func NewRegisterUserService(ctx context.Context, svcCtx *svc.ServiceContext) *Re
 		svcCtx: svcCtx,
 	}
 }
-
+func (l *RegisterUserService) GetCtx() context.Context {
+	return l.ctx
+}
 func (l *RegisterUserService) RegisterUser(req *userDto.RegisterUserReq) (resp *userDto.RegisterUserResp, err error) {
 	// 加密密码（在事务外处理，避免事务过长）
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)

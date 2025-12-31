@@ -62,6 +62,9 @@ type UserRepository interface {
 	// Delete 通过 ID 软删除用户
 	Delete(ctx context.Context, id uuid.UUID) error
 
+	// DeleteByUsername 通过用户名删除用户
+	DeleteByUsername(ctx context.Context, username string) error
+
 	// List 分页获取用户列表，返回用户切片和总数
 	List(ctx context.Context, offset, limit int) ([]*userEntity.User, int64, error)
 }
@@ -101,7 +104,10 @@ func (r *userRepositoryImpl) GetByUsername(ctx context.Context, username string)
 // ExistsByUsername Implements [UserRepository.ExistsByUsername]
 func (r *userRepositoryImpl) ExistsByUsername(ctx context.Context, username string) (bool, error) {
 	var count int64
-	err := r.db.WithContext(ctx).Model(&userEntity.User{}).Where("username = ?", username).Count(&count).Error
+	err := r.db.WithContext(ctx).
+		Model(&userEntity.User{}).
+		Where(&userEntity.User{Username: username}).
+		Count(&count).Error
 	if err != nil {
 		return false, err
 	}
@@ -111,7 +117,7 @@ func (r *userRepositoryImpl) ExistsByUsername(ctx context.Context, username stri
 // GetByEmail Implements [UserRepository.GetByEmail]
 func (r *userRepositoryImpl) GetByEmail(ctx context.Context, email string) (*userEntity.User, error) {
 	var user userEntity.User
-	err := r.db.WithContext(ctx).Where(`email = ?`, email).First(&user).Error
+	err := r.db.WithContext(ctx).Where(&userEntity.User{Email: email}).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +128,10 @@ func (r *userRepositoryImpl) GetByEmail(ctx context.Context, email string) (*use
 func (r *userRepositoryImpl) GetByPhone(ctx context.Context, phoneCountryCode, phoneNumber string) (*userEntity.User, error) {
 	var user userEntity.User
 	err := r.db.WithContext(ctx).
-		Where(`phone_country_code = ? AND phone_number = ?`, phoneCountryCode, phoneNumber).
+		Where(&userEntity.User{
+			PhoneCountryCode: phoneCountryCode,
+			PhoneNumber:      phoneNumber,
+		}).
 		First(&user).Error
 	if err != nil {
 		return nil, err
@@ -132,15 +141,18 @@ func (r *userRepositoryImpl) GetByPhone(ctx context.Context, phoneCountryCode, p
 
 // ExistsByPhone Implements [UserRepository.ExistsByPhone]
 func (r *userRepositoryImpl) ExistsByPhone(ctx context.Context, phoneCountryCode, phoneNumber string) (bool, error) {
-	var count int64
+	var exists bool
+	// 💡 额外提示：考虑使用 Select("1").Limit(1) 优化 EXISTS
 	err := r.db.WithContext(ctx).
-		Model(&userEntity.User{}).
-		Where("phone_country_code = ? AND phone_number = ?", phoneCountryCode, phoneNumber).
-		Count(&count).Error
+		Model(&userEntity.User{}). // ✅ 必要，不能省略。它是 Count 正确执行的前提，且与结构体绑定，支持表名自定义、软删除等 GORM 特性
+		Select("1").
+		Where(&userEntity.User{PhoneCountryCode: phoneCountryCode, PhoneNumber: phoneNumber}).
+		Limit(1).
+		Find(&exists).Error // 注意：这里用 Find，但只关心是否找到
 	if err != nil {
 		return false, err
 	}
-	return count > 0, nil
+	return exists, nil
 }
 
 // Update Implements [UserRepository.Update]
@@ -151,6 +163,14 @@ func (r *userRepositoryImpl) Update(ctx context.Context, user *userEntity.User) 
 // Delete Implements [UserRepository.Delete]
 func (r *userRepositoryImpl) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Where("id = ?", id[:]).Delete(&userEntity.User{}).Error
+}
+
+// DeleteByUsername implements [UserRepository.DeleteByUsername].
+func (r *userRepositoryImpl) DeleteByUsername(ctx context.Context, username string) error {
+	return r.db.WithContext(ctx).
+		Where(&userEntity.User{Username: username}).
+		Delete(&userEntity.User{}).
+		Error
 }
 
 // List Implements [UserRepository.List]

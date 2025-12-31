@@ -38,12 +38,13 @@ func RegisterUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 
 		l := userService.NewRegisterUserService(r.Context(), svcCtx)
 		resp, err := l.RegisterUser(&req)
+		ctx := l.GetCtx() // 使用服务层的上下文以包含日志字段
 		if err != nil {
-			switch {
-			case errors.Is(err, userService.ErrUsernameExists):
+			l.Logger.WithContext(ctx).Errorf("failed to get user: %v", err)
+			if errors.Is(err, userService.ErrUsernameExists) {
 				// TODO: 塞入 i18n 信息
 				httpx.ErrorCtx(r.Context(), w, err)
-			default:
+			} else {
 				// 默认情况，内部服务错误
 				httpx.ErrorCtx(r.Context(), w, err)
 			}

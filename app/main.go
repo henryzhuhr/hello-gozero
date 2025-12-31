@@ -1,6 +1,4 @@
-// Code scaffolded by goctl. Safe to edit.
-// goctl 1.9.2
-
+// Main entry point for the Hello GoZero application.
 package main
 
 import (
@@ -25,10 +23,11 @@ import (
 	"github.com/zeromicro/go-zero/rest"
 )
 
+// 全局配置文件路径
 var configFile = flag.String("f", "etc/hellogozero.yaml", "the config file")
 
 func main() {
-	flag.Parse()
+	flag.Parse() // 加载配置文件
 
 	var c config.Config
 	conf.MustLoad(*configFile, &c)
@@ -68,7 +67,7 @@ func main() {
 	// 启动 HTTP 服务（非阻塞）
 	go func() {
 		// 启动服务
-		fmt.Printf("🚀 Starting server at %s:%d...\n", c.Host, c.Port)
+		fmt.Printf("🚀 Starting HTTP server at %s:%d...\n", c.Host, c.Port)
 		server.Start()
 	}()
 

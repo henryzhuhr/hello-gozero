@@ -5,6 +5,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,13 +16,18 @@ import (
 	"hello-gozero/internal/svc"
 )
 
+var (
+	ErrUserNotFound    = errors.New("user not found")
+	ErrMissingUsername = errors.New("missing username")
+)
+
 type GetUserService struct {
 	Logger logx.Logger
 	ctx    context.Context
 	svcCtx *svc.ServiceContext
 }
 
-// 获取单个用户
+// NewGetUserService 获取单个用户
 func NewGetUserService(ctx context.Context, svcCtx *svc.ServiceContext) *GetUserService {
 	return &GetUserService{
 		Logger: logx.WithContext(ctx),
@@ -29,13 +35,14 @@ func NewGetUserService(ctx context.Context, svcCtx *svc.ServiceContext) *GetUser
 		svcCtx: svcCtx,
 	}
 }
+
 func (l *GetUserService) GetCtx() context.Context {
 	return l.ctx
 }
 
 func (l *GetUserService) GetUser(req *userDto.GetUserReq) (resp *userDto.GetUserResp, err error) {
 	if req == nil || req.Username == "" {
-		return nil, fmt.Errorf("missing username")
+		return nil, ErrMissingUsername
 	}
 
 	cachedEntity, err := l.svcCtx.Repository.CachedUser.GetByUsername(l.ctx, req.Username)
@@ -46,7 +53,7 @@ func (l *GetUserService) GetUser(req *userDto.GetUserReq) (resp *userDto.GetUser
 	l.Logger.WithContext(l.ctx).Debugf("GetUser: fetched user '%s' from %s", req.Username, cachedEntity.DataSource)
 	if cachedEntity.User == nil {
 		// 用户不存在
-		return nil, nil
+		return nil, ErrUserNotFound
 	}
 
 	return l.userEntityToResp(cachedEntity.User), nil
