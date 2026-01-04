@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	cacheKeyPrefix   = "user:info"
+	cacheKeyPrefix = "user:profile" // 用户缓存键前缀
+
 	cacheEmptyTTL    = 60 * time.Second // 缓存空对象的 TTL
 	cachedEmptyValue = "null"           // 缓存空对象的特殊标记
 
@@ -36,11 +37,17 @@ type CachedUserEntity struct {
 // CachedUserRepository 定义用户缓存接口
 // 带缓存的装饰器，用于特殊场景，如：防重复提交、限流
 type CachedUserRepository interface {
+	// GetCachedKey 获取指定用户名的缓存键，通常应该是内部使用
+	GetCachedKey(username string) string
+
 	// GetByUsername 从缓存获取用户，如果未命中则回源数据库
 	GetByUsername(ctx context.Context, username string) (*CachedUserEntity, error)
 
 	// SetByUsername 将用户信息写入缓存
 	SetByUsername(ctx context.Context, user *CachedUserEntity) error
+
+	// DeleteByUsername 删除指定用户名的缓存
+	DeleteByUsername(ctx context.Context, username string) error
 }
 
 // CachedUserRepositoryImpl Implements [CachedUserRepository]
@@ -54,8 +61,7 @@ type CachedUserRepositoryImpl struct {
 	group singleflight.Group // ← 新增
 }
 
-// NewCachedUserRepository
-// Creates a new CachedUserRepository instance
+// NewCachedUserRepository Creates a new CachedUserRepository instance
 // Parameters:
 //   - client: Redis 客户端实例
 //   - repo: 底层 UserRepository 实例
@@ -66,6 +72,11 @@ func NewCachedUserRepository(redisInfra *cache.RedisInfra, repo UserRepository) 
 		redisInfra: redisInfra,
 		repo:       repo,
 	}
+}
+
+// GetCachedKey Implements [CachedUserRepository.GetCachedKey]
+func (c *CachedUserRepositoryImpl) GetCachedKey(username string) string {
+	return cacheKeyPrefix + ":" + username
 }
 
 // GetByUsername Implements [CachedUserRepository.GetByUsername]
@@ -171,7 +182,7 @@ func (c *CachedUserRepositoryImpl) SetByUsername(ctx context.Context, cachedEnti
 		return err
 	}
 
-	key := c.getCachedKey(cachedEntity.User.Username)
+	key := c.GetCachedKey(cachedEntity.User.Username)
 	// 写入 Redis，设置过期时间（cacheTTL）
 	// 	二、缓存雪崩（Cache Avalanche）
 	// 🔍 问题表现
@@ -183,7 +194,7 @@ func (c *CachedUserRepositoryImpl) SetByUsername(ctx context.Context, cachedEnti
 
 // setEmptyUserCache 缓存一个“空用户”标记，防止缓存穿透
 func (c *CachedUserRepositoryImpl) setEmptyUserCache(ctx context.Context, username string, ttl time.Duration) error {
-	key := c.getCachedKey(username)
+	key := c.GetCachedKey(username)
 	// 方式 1：存一个特殊字符串
 	return c.redisInfra.Client.Set(ctx, key, cachedEmptyValue, ttl).Err()
 
@@ -193,6 +204,10 @@ func (c *CachedUserRepositoryImpl) setEmptyUserCache(ctx context.Context, userna
 	// return c.redisInfra.Client.Set(ctx, key, buf.Bytes(), ttl).Err()
 }
 
-func (c *CachedUserRepositoryImpl) getCachedKey(username string) string {
-	return cacheKeyPrefix + ":" + username
+// DeleteByUsername Implements [CachedUserRepository.DeleteByUsername]
+// 删除指定用户名的缓存，包括正常缓存和空值标记缓存
+// 返回 Redis Del 命令的错误（如果有）
+func (c *CachedUserRepositoryImpl) DeleteByUsername(ctx context.Context, username string) error {
+	key := c.GetCachedKey(username)
+	return c.redisInfra.Client.Del(ctx, key).Err()
 }

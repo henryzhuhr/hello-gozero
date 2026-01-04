@@ -2,6 +2,7 @@
 """
 快速验证脚本 - 在不启动完整测试套件的情况下验证服务是否正常
 """
+
 import requests
 from loguru import logger
 

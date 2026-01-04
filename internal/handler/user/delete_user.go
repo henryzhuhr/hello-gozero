@@ -33,8 +33,8 @@ func DeleteUserHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 				// 用户不存在错误，返回 404 状态码和自定义错误信息
 				w.WriteHeader(http.StatusNotFound)
 				httpx.WriteJsonCtx(ctx, w, http.StatusNotFound, map[string]interface{}{
-					"code": http.StatusNotFound,
-					"msg":  "user not found",
+					"code":    http.StatusNotFound,
+					"message": "user not found",
 				})
 				return
 			} else {
