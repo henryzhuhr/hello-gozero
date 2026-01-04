@@ -43,7 +43,7 @@ func (e RegisterUserValidationError) Error() string {
 	return fmt.Sprintf("invalid field %s: %s", e.Field, e.Code)
 }
 
-// 可选：实现一个方法返回结构化数据
+// ToMap 可选：实现一个方法返回结构化数据
 func (e RegisterUserValidationError) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"field": e.Field,
@@ -73,6 +73,17 @@ func (u *RegisterUserReq) Validate() error {
 	return nil
 }
 
+// validateUsername 校验用户名是否合法
+//
+// 支持：
+//   - 非空
+//   - 黑名单校验（如 "admin", "root" 等）
+//   - 最小长度（如 3）
+//   - 格式校验（只允许字母、数字、下划线、点等）
+//
+// 不支持
+//   - 中文字符（根据需求可添加）
+//   - emoji（根据需求可添加）
 func (u *RegisterUserReq) validateUsername() error {
 	if u.Username == "" {
 		return RegisterUserValidationError{Field: "username", Code: "required"}
@@ -113,6 +124,7 @@ func (u *RegisterUserReq) validatePhone() error {
 	return nil
 }
 
+// validateEmail 简单校验邮箱格式
 func (u *RegisterUserReq) validateEmail() error {
 	if u.Email == "" {
 		return nil // optional field, skip

@@ -14,6 +14,8 @@ import pytest
 import requests
 from loguru import logger
 
+from test.api_client import ApiClient
+
 """测试套
 Pytest Fixture 机制
 
@@ -70,3 +72,20 @@ def go_server():
         except:
             pass
     logger.success("Go 服务器已停止")
+
+
+@pytest.fixture(scope="session")
+def api_client():
+    """创建 API 客户端 fixture，自动管理连接生命周期
+
+    使用 session 级别，整个测试会话共享同一个客户端实例，
+    测试结束后自动关闭连接池
+    """
+    client = ApiClient(base_url="http://localhost:8888")
+    logger.debug("创建 ApiClient 实例")
+
+    yield client
+
+    # 测试结束后关闭连接
+    client.close()
+    logger.debug("ApiClient 连接已关闭")

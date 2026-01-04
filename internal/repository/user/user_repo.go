@@ -104,6 +104,8 @@ func (r *userRepositoryImpl) GetByUsername(ctx context.Context, username string)
 // ExistsByUsername Implements [UserRepository.ExistsByUsername]
 func (r *userRepositoryImpl) ExistsByUsername(ctx context.Context, username string) (bool, error) {
 	var count int64
+	// var exists bool
+	// 💡 额外提示：考虑使用 Select("1").Limit(1) 优化 EXISTS
 	err := r.db.WithContext(ctx).
 		Model(&userEntity.User{}).
 		Where(&userEntity.User{Username: username}).

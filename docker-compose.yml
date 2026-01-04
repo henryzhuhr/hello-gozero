@@ -39,6 +39,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s # 等待 MySQL 启动完成
+    volumes:
+      # 初始化数据库脚本
+      # 重要：脚本只在数据目录为空时运行一次！ 如果你已经有一个持久化的数据卷，那么即使你更新了脚本，再次启动容器也不会重新执行这些初始化脚本。
+      # 删除容器及其关联的数据卷: docker-compose down -v
+      - ./sql:/docker-entrypoint-initdb.d
   
   # Redis
   redis:
