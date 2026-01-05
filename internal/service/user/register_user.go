@@ -5,11 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	"github.com/zeromicro/go-zero/core/logx"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
+	"hello-gozero/infra/cache"
 	userConstant "hello-gozero/internal/constant/user"
 	userDto "hello-gozero/internal/dto/user"
 	userEntity "hello-gozero/internal/entity/user"
@@ -20,6 +24,9 @@ import (
 var (
 	// 用户名已存在
 	ErrUsernameExists = errors.New("username already exists")
+
+	// 邮箱已存在
+	ErrEmailExists = errors.New("email already exists")
 
 	// 手机号已存在
 	ErrPhoneExists = errors.New("phone already exists")
@@ -49,58 +56,92 @@ func (l *RegisterUserService) RegisterUser(req *userDto.RegisterUserReq) (resp *
 		return nil, fmt.Errorf("failed to hash password: %v", err)
 	}
 
-	// 使用事务确保数据一致性
-	txErr := l.svcCtx.Repository.User.Transaction(l.ctx, func(txRepo userRepo.UserRepository) error {
-		// 检查用户名是否已存在
-		exists, err := txRepo.ExistsByUsername(l.ctx, req.Username)
-		if err != nil {
-			return fmt.Errorf("failed to check username existence: %v", err)
-		}
-		if exists {
-			return ErrUsernameExists
-		}
+	// 创建用户实体
+	user := &userEntity.User{
+		// ID 由 [userEntity.User.BeforeCreate] hook 自动生成，不应该显式设置
+		Username:         req.Username,
+		Password:         string(hashedPassword),
+		Email:            req.Email,
+		PhoneCountryCode: req.PhoneCountryCode,
+		PhoneNumber:      req.PhoneNumber,
+		Nickname:         req.Nickname,
+		Status:           userConstant.StatusActive, // 默认正常状态
+	}
 
-		// 检查手机号是否已存在，避免用户重复注册
-		exists, err = txRepo.ExistsByPhone(l.ctx, req.PhoneCountryCode, req.PhoneNumber)
-		if err != nil {
-			return fmt.Errorf("failed to check phone existence: %v", err)
-		}
-		if exists {
-			return ErrPhoneExists
-		}
+	// ============================================================
+	// 使用 Redis 分布式锁避免并发注册冲突
+	// ============================================================
+	// 优势：
+	//   1. 解耦业务代码和数据库实现细节（不依赖索引名称判断）
+	//   2. 在应用层面序列化并发请求，减少数据库压力
+	//   3. 数据库唯一索引作为最后防线，保证数据完整性
+	// 锁的粒度：基于用户名（可以根据需求调整为邮箱/手机号）
+	lockKey := fmt.Sprintf("lock:user:register:%s", req.Username)
+	lockValue := uuid.New().String() // 锁的唯一标识
+	lockTTL := 10 * time.Second      // 锁的过期时间（防止死锁）
 
-		// 检查邮箱是否已存在（如果提供）
-		if req.Email != "" {
-			existingUser, err := txRepo.GetByEmail(l.ctx, req.Email)
-			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-				return fmt.Errorf("failed to check email existence: %v", err)
+	// 使用 Redis 锁保护注册逻辑
+	err = cache.WithLock(l.ctx, l.svcCtx.Infra.Redis.Client, lockKey, lockValue, lockTTL, func() error {
+		// 使用事务确保数据一致性
+		return l.svcCtx.Repository.User.Transaction(l.ctx, func(txRepo userRepo.UserRepository) error {
+			// 检查用户名是否已存在（事务内查询，保证一致性）
+			exists, err := txRepo.ExistsByUsername(l.ctx, req.Username)
+			if err != nil {
+				return fmt.Errorf("failed to check username existence: %w", err)
 			}
-			if existingUser != nil {
-				return errors.New("email already exists")
+			if exists {
+				return ErrUsernameExists
 			}
-		}
 
-		// 创建用户实体
-		user := &userEntity.User{
-			// ID 由 [userEntity.User.BeforeCreate] hook 自动生成，不应该显式设置
-			Username:         req.Username,
-			Password:         string(hashedPassword),
-			Email:            req.Email,
-			PhoneCountryCode: req.PhoneCountryCode,
-			PhoneNumber:      req.PhoneNumber,
-			Nickname:         req.Nickname,
-			Status:           userConstant.StatusActive, // 默认正常状态
-		}
+			// 检查邮箱是否已存在（如果提供）
+			if req.Email != "" {
+				existingUser, err := txRepo.GetByEmail(l.ctx, req.Email)
+				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+					return fmt.Errorf("failed to check email existence: %w", err)
+				}
+				if existingUser != nil {
+					return ErrEmailExists
+				}
+			}
 
-		// 保存到数据库
-		if err := txRepo.Create(l.ctx, user); err != nil {
-			return fmt.Errorf("failed to create user: %v", err)
-		}
+			// 检查手机号是否已存在
+			exists, err = txRepo.ExistsByPhone(l.ctx, req.PhoneCountryCode, req.PhoneNumber)
+			if err != nil {
+				return fmt.Errorf("failed to check phone existence: %w", err)
+			}
+			if exists {
+				return ErrPhoneExists
+			}
 
-		return nil
+			// 创建用户
+			if err := txRepo.Create(l.ctx, user); err != nil {
+				// 如果仍然发生唯一性冲突（极端情况：锁失效或数据库约束）
+				// 数据库唯一索引作为最后防线
+				if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
+					// 通过再次查询确定是哪个字段冲突（不依赖索引名称）
+					if exists, _ := txRepo.ExistsByUsername(l.ctx, req.Username); exists {
+						return ErrUsernameExists
+					}
+					if req.Email != "" {
+						if u, _ := txRepo.GetByEmail(l.ctx, req.Email); u != nil {
+							return ErrEmailExists
+						}
+					}
+					if exists, _ := txRepo.ExistsByPhone(l.ctx, req.PhoneCountryCode, req.PhoneNumber); exists {
+						return ErrPhoneExists
+					}
+					// 通用唯一性冲突（无法确定具体字段）
+					return errors.New("user already exists")
+				}
+				return fmt.Errorf("failed to create user: %w", err)
+			}
+
+			return nil
+		})
 	})
-	if txErr != nil {
-		return nil, txErr
+
+	if err != nil {
+		return nil, err
 	}
 
 	// 返回结果

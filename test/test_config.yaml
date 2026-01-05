@@ -1,0 +1,71 @@
+# 测试配置文件
+# 包含性能基准、数据库配置、服务配置等
+
+# 服务配置
+service:
+  # API 服务地址
+  base_url: "http://localhost:8888"
+  # 健康检查地址
+  health_check_url: "http://localhost:8888/api/health"
+  # 服务启动超时时间(秒)
+  startup_timeout: 30
+  # 服务关闭超时时间(秒)
+  shutdown_timeout: 5
+
+# 数据库配置(可选，用于直接数据库操作测试)
+database:
+  host: "mysql"
+  port: 3306
+  user: "root"
+  password: "rootpassword"
+  database: "hello_gozero"
+  charset: "utf8mb4"
+
+# Redis 配置(可选)
+redis:
+  host: "redis"
+  port: 6379
+  db: 0
+
+# 性能测试配置
+# 所有时间单位均为毫秒(ms)
+performance:
+  # 用户模块性能基准
+  user:
+    # 用户注册接口性能基准
+    register_user:
+      # 单次注册响应时间基准
+      response_time_baseline: 500
+      # 并发注册成功率基准(百分比)
+      concurrent_success_rate: 0.8
+      # 批量注册成功率基准(百分比)
+      bulk_success_rate: 0.95
+      # 性能衰减系数(最慢响应/平均响应的最大比例)
+      performance_degradation_factor: 3.0
+      # 并发测试用户数
+      concurrent_users: 10
+      # 重复用户名并发测试数
+      duplicate_username_concurrent: 5
+      # 批量注册压力测试用户数
+      bulk_count: 50
+
+    # 获取用户接口性能基准
+    get_user:
+      # 单次查询响应时间基准
+      response_time_baseline: 100
+      # 并发查询数
+      concurrent_count: 20
+      # 热查询次数
+      hot_query_count: 10
+      # 缓存性能提升比例(热查询应不超过冷查询的百分比)
+      cache_performance_ratio: 0.8
+      # 批量查询用户数（考虑到服务器资源限制，减少到15）
+      bulk_count: 15
+      # 批量查询成功率基准(百分比)
+      bulk_success_rate: 0.95
+
+    # 删除用户接口性能基准(预留)
+    delete_user:
+      response_time_baseline: 200
+      concurrent_count: 10
+      bulk_success_rate: 0.95
