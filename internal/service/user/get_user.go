@@ -5,7 +5,6 @@ package user
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -14,11 +13,6 @@ import (
 	userDto "hello-gozero/internal/dto/user"
 	userEntity "hello-gozero/internal/entity/user"
 	"hello-gozero/internal/svc"
-)
-
-var (
-	ErrUserNotFound    = errors.New("user not found")
-	ErrMissingUsername = errors.New("missing username")
 )
 
 type GetUserService struct {

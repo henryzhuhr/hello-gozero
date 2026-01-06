@@ -1,3 +1,4 @@
+// Package user 获取用户的请求
 package user
 
 // GetUserReq 获取单个用户请求

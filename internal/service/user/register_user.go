@@ -21,17 +21,6 @@ import (
 	"hello-gozero/internal/svc"
 )
 
-var (
-	// 用户名已存在
-	ErrUsernameExists = errors.New("username already exists")
-
-	// 邮箱已存在
-	ErrEmailExists = errors.New("email already exists")
-
-	// 手机号已存在
-	ErrPhoneExists = errors.New("phone already exists")
-)
-
 type RegisterUserService struct {
 	Logger logx.Logger
 	ctx    context.Context
@@ -46,10 +35,10 @@ func NewRegisterUserService(ctx context.Context, svcCtx *svc.ServiceContext) *Re
 		svcCtx: svcCtx,
 	}
 }
-func (l *RegisterUserService) GetCtx() context.Context {
-	return l.ctx
+func (s *RegisterUserService) GetCtx() context.Context {
+	return s.ctx
 }
-func (l *RegisterUserService) RegisterUser(req *userDto.RegisterUserReq) (resp *userDto.RegisterUserResp, err error) {
+func (s *RegisterUserService) RegisterUser(req *userDto.RegisterUserReq) (resp *userDto.RegisterUserResp, err error) {
 	// 加密密码（在事务外处理，避免事务过长）
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -81,11 +70,11 @@ func (l *RegisterUserService) RegisterUser(req *userDto.RegisterUserReq) (resp *
 	lockTTL := 10 * time.Second      // 锁的过期时间（防止死锁）
 
 	// 使用 Redis 锁保护注册逻辑
-	err = cache.WithLock(l.ctx, l.svcCtx.Infra.Redis.Client, lockKey, lockValue, lockTTL, func() error {
+	err = cache.WithLock(s.ctx, s.svcCtx.Infra.Redis.Client, lockKey, lockValue, lockTTL, func() error {
 		// 使用事务确保数据一致性
-		return l.svcCtx.Repository.User.Transaction(l.ctx, func(txRepo userRepo.UserRepository) error {
+		return s.svcCtx.Repository.User.Transaction(s.ctx, func(txRepo userRepo.UserRepository) error {
 			// 检查用户名是否已存在（事务内查询，保证一致性）
-			exists, err := txRepo.ExistsByUsername(l.ctx, req.Username)
+			exists, err := txRepo.ExistsByUsername(s.ctx, req.Username)
 			if err != nil {
 				return fmt.Errorf("failed to check username existence: %w", err)
 			}
@@ -95,7 +84,7 @@ func (l *RegisterUserService) RegisterUser(req *userDto.RegisterUserReq) (resp *
 
 			// 检查邮箱是否已存在（如果提供）
 			if req.Email != "" {
-				existingUser, err := txRepo.GetByEmail(l.ctx, req.Email)
+				existingUser, err := txRepo.GetByEmail(s.ctx, req.Email)
 				if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 					return fmt.Errorf("failed to check email existence: %w", err)
 				}
@@ -105,7 +94,7 @@ func (l *RegisterUserService) RegisterUser(req *userDto.RegisterUserReq) (resp *
 			}
 
 			// 检查手机号是否已存在
-			exists, err = txRepo.ExistsByPhone(l.ctx, req.PhoneCountryCode, req.PhoneNumber)
+			exists, err = txRepo.ExistsByPhone(s.ctx, req.PhoneCountryCode, req.PhoneNumber)
 			if err != nil {
 				return fmt.Errorf("failed to check phone existence: %w", err)
 			}
@@ -114,20 +103,20 @@ func (l *RegisterUserService) RegisterUser(req *userDto.RegisterUserReq) (resp *
 			}
 
 			// 创建用户
-			if err := txRepo.Create(l.ctx, user); err != nil {
+			if err := txRepo.Create(s.ctx, user); err != nil {
 				// 如果仍然发生唯一性冲突（极端情况：锁失效或数据库约束）
 				// 数据库唯一索引作为最后防线
 				if mysqlErr, ok := err.(*mysql.MySQLError); ok && mysqlErr.Number == 1062 {
 					// 通过再次查询确定是哪个字段冲突（不依赖索引名称）
-					if exists, _ := txRepo.ExistsByUsername(l.ctx, req.Username); exists {
+					if exists, _ := txRepo.ExistsByUsername(s.ctx, req.Username); exists {
 						return ErrUsernameExists
 					}
 					if req.Email != "" {
-						if u, _ := txRepo.GetByEmail(l.ctx, req.Email); u != nil {
+						if u, _ := txRepo.GetByEmail(s.ctx, req.Email); u != nil {
 							return ErrEmailExists
 						}
 					}
-					if exists, _ := txRepo.ExistsByPhone(l.ctx, req.PhoneCountryCode, req.PhoneNumber); exists {
+					if exists, _ := txRepo.ExistsByPhone(s.ctx, req.PhoneCountryCode, req.PhoneNumber); exists {
 						return ErrPhoneExists
 					}
 					// 通用唯一性冲突（无法确定具体字段）

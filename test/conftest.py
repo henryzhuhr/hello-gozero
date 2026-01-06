@@ -14,7 +14,7 @@ import pytest
 import requests
 from loguru import logger
 
-from test.api_client import ApiClient
+from test.helpers import ApiClient
 from test.performance_models import TestConfig
 
 """测试套

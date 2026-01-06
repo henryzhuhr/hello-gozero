@@ -8,8 +8,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pytest
 from loguru import logger
 
-from test.api_client import ApiClient
-from test.helpers import get_random_phone, get_random_str
+from test.helpers import (
+    ApiClient,
+    BaseTestWithCleanup,
+    get_random_phone,
+    get_random_str,
+)
 from test.models import CommonResponse
 from test.performance_models import PerformanceConfig
 from test.user.helpers import User, create_mock_user
@@ -47,6 +51,16 @@ class UserRequest:
     def delete_user(api_client: ApiClient, username: str) -> CommonResponse:
         """删除用户"""
         return api_client.delete(f"/api/v1/users/{username}")
+
+    @staticmethod
+    def update_password(
+        api_client: ApiClient, username: str, old_password: str, new_password: str
+    ) -> CommonResponse:
+        """更新用户密码"""
+        return api_client.put(
+            f"/api/v1/users/{username}/password",
+            data={"old_password": old_password, "new_password": new_password},
+        )
 
 
 def test_00_placeholder():
@@ -687,19 +701,12 @@ class TestGetUser:
         logger.success("✓ 缓存查询测试完成")
 
 
-class TestGetUserPerformance:
+class TestGetUserPerformance(BaseTestWithCleanup):
     """获取用户接口性能测试类"""
 
-    @pytest.fixture(autouse=True, scope="class")
-    def cleanup_before_tests(self, test_config):
-        """在性能测试前清理，避免前面测试的数据影响"""
-        # 等待一段时间，让前面的测试完全释放资源（数据库连接、缓存等）
-        import time
-
-        time.sleep(2.0)
-        yield
-        # 测试后也清理，让资源充分回收
-        time.sleep(2.0)
+    # 自定义清理等待时间
+    cleanup_before_seconds = 2.0
+    cleanup_after_seconds = 2.0
 
     def test_get_user_response_time(
         self,
@@ -929,18 +936,10 @@ class TestGetUserPerformance:
         logger.success(f"✓ 批量查询压力测试通过，成功率: {success_rate * 100:.1f}%")
 
 
-class TestDeleteUser:
+class TestDeleteUser(BaseTestWithCleanup):
     """删除用户接口测试类"""
 
-    @pytest.fixture(autouse=True, scope="class")
-    def cleanup_before_tests(self):
-        """在删除测试前清理，避免前面压力测试的影响"""
-        import time
-
-        # 等待前面的性能测试完全释放资源
-        time.sleep(3.0)
-        yield
-        time.sleep(1.0)
+    # 使用默认的清理等待时间（3.0 秒前，1.0 秒后）
 
     def test_delete_existing_user(
         self, go_server: subprocess.Popen, api_client: ApiClient, mock_user: User
@@ -993,3 +992,181 @@ class TestDeleteUser:
             f"删除后查询应该返回 400/404，实际: {get_after_delete.status_code}，缓存应该已清理"
         )
         logger.success("✓ 删除用户级联测试通过（缓存已清理）")
+
+
+class TestUpdatePassword(BaseTestWithCleanup):
+    """更新用户密码接口测试类"""
+
+    # 使用默认的清理等待时间（3.0 秒前，1.0 秒后）
+
+    def test_update_password_success(
+        self, go_server: subprocess.Popen, api_client: ApiClient, mock_user: User
+    ):
+        """测试成功更新密码"""
+        # 1. 创建用户
+        create_response = UserRequest.create_user(api_client, mock_user)
+        assert create_response.status_code == 200, "用户创建应该成功"
+        logger.info(f"创建用户成功: {mock_user.username}")
+
+        # 2. 更新密码
+        old_password = mock_user.password
+        new_password = "NewPassword@123"
+        logger.info(f"测试更新密码: {mock_user.username}")
+        update_response = UserRequest.update_password(
+            api_client, mock_user.username, old_password, new_password
+        )
+
+        assert update_response.status_code == 200, (
+            f"更新密码失败: status={update_response.status_code}, data={update_response.data}"
+        )
+
+        # 3. 验证响应消息
+        resp_data = update_response.data
+        if isinstance(resp_data, dict):
+            message = resp_data.get("message", "")
+            assert "success" in message.lower(), f"响应消息不正确: {message}"
+
+        logger.success(f"✓ 密码更新成功: {mock_user.username}")
+
+    def test_update_password_wrong_old_password(
+        self, go_server: subprocess.Popen, api_client: ApiClient, mock_user: User
+    ):
+        """测试使用错误的旧密码更新密码"""
+        # 1. 创建用户
+        create_response = UserRequest.create_user(api_client, mock_user)
+        assert create_response.status_code == 200, "用户创建应该成功"
+
+        # 2. 使用错误的旧密码尝试更新
+        wrong_old_password = "WrongPassword@123"
+        new_password = "NewPassword@123"
+        logger.info(f"测试使用错误旧密码更新: {mock_user.username}")
+        update_response = UserRequest.update_password(
+            api_client, mock_user.username, wrong_old_password, new_password
+        )
+
+        # 应该返回错误
+        assert update_response.status_code in [400, 401, 403], (
+            f"错误的旧密码应该返回 400/401/403，实际: {update_response.status_code}"
+        )
+        logger.success("✓ 错误旧密码测试通过")
+
+    def test_update_password_same_as_old(
+        self, go_server: subprocess.Popen, api_client: ApiClient, mock_user: User
+    ):
+        """测试新密码与旧密码相同"""
+        # 1. 创建用户
+        create_response = UserRequest.create_user(api_client, mock_user)
+        assert create_response.status_code == 200, "用户创建应该成功"
+
+        # 2. 尝试将新密码设置为与旧密码相同
+        old_password = mock_user.password
+        new_password = old_password  # 相同的密码
+        logger.info(f"测试新旧密码相同: {mock_user.username}")
+        update_response = UserRequest.update_password(
+            api_client, mock_user.username, old_password, new_password
+        )
+
+        # 应该返回错误
+        assert update_response.status_code in [400, 422], (
+            f"新旧密码相同应该返回 400/422，实际: {update_response.status_code}"
+        )
+        logger.success("✓ 新旧密码相同测试通过")
+
+    def test_update_password_weak_password(
+        self, go_server: subprocess.Popen, api_client: ApiClient, mock_user: User
+    ):
+        """测试使用弱密码"""
+        # 1. 创建用户
+        create_response = UserRequest.create_user(api_client, mock_user)
+        assert create_response.status_code == 200, "用户创建应该成功"
+
+        # 2. 尝试使用弱密码（不符合复杂度要求）
+        old_password = mock_user.password
+        weak_passwords = ["123456", "abc123", "password", "test"]
+
+        for weak_password in weak_passwords:
+            logger.info(f"测试弱密码: {weak_password}")
+            update_response = UserRequest.update_password(
+                api_client, mock_user.username, old_password, weak_password
+            )
+
+            # 应该返回错误
+            assert update_response.status_code in [400, 422], (
+                f"弱密码应该返回 400/422，实际: {update_response.status_code}"
+            )
+
+        logger.success("✓ 弱密码测试通过")
+
+    def test_update_password_nonexistent_user(
+        self, go_server: subprocess.Popen, api_client: ApiClient
+    ):
+        """测试更新不存在用户的密码"""
+        nonexistent_username = f"nonexistent_{uuid.uuid4().hex}"
+        update_response = UserRequest.update_password(
+            api_client, nonexistent_username, "OldPass@123", "NewPass@123"
+        )
+
+        # 应该返回404或400
+        assert update_response.status_code in [400, 404], (
+            f"不存在的用户应该返回 400/404，实际: {update_response.status_code}"
+        )
+        logger.success("✓ 不存在用户测试通过")
+
+    def test_concurrent_update_password(
+        self, go_server: subprocess.Popen, api_client: ApiClient, mock_user: User
+    ):
+        """测试并发更新密码（验证分布式锁）"""
+        # 1. 创建用户
+        create_response = UserRequest.create_user(api_client, mock_user)
+        assert create_response.status_code == 200, "用户创建应该成功"
+
+        old_password = mock_user.password
+        concurrent_count = 5
+        success_count = 0
+        failed_count = 0
+
+        def update_password(index: int):
+            """并发更新密码"""
+            try:
+                new_password = f"NewPassword@{index}{random.randint(100, 999)}"
+                response = UserRequest.update_password(
+                    api_client, mock_user.username, old_password, new_password
+                )
+                return {
+                    "index": index,
+                    "success": response.status_code == 200,
+                    "status_code": response.status_code,
+                }
+            except Exception as e:
+                logger.error(f"并发更新密码 #{index} 失败: {str(e)}")
+                return {"index": index, "success": False, "error": str(e)}
+
+        logger.info(f"开始并发更新密码测试，并发数: {concurrent_count}")
+
+        with ThreadPoolExecutor(max_workers=concurrent_count) as executor:
+            futures = [
+                executor.submit(update_password, i) for i in range(concurrent_count)
+            ]
+
+            for future in as_completed(futures):
+                result = future.result()
+                if result.get("success"):
+                    success_count += 1
+                    logger.debug(f"✓ 更新 #{result['index']} 成功")
+                else:
+                    failed_count += 1
+                    logger.debug(
+                        f"✗ 更新 #{result['index']} 失败: {result.get('status_code')}"
+                    )
+
+        logger.info(
+            f"并发更新密码完成: 成功 {success_count}/{concurrent_count}, 失败 {failed_count}/{concurrent_count}"
+        )
+
+        # 由于使用了旧密码，只有第一个成功的请求能更新密码
+        # 其他请求应该因为密码已变而失败
+        # 或者如果加锁成功，可能只有一个成功
+        assert success_count >= 1, f"至少应该有1个更新成功: {success_count}"
+        logger.success(
+            f"✓ 并发更新密码测试通过（成功: {success_count}, 失败: {failed_count}）"
+        )

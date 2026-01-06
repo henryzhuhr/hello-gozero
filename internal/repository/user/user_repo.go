@@ -94,7 +94,7 @@ func (r *userRepositoryImpl) Create(ctx context.Context, user *userEntity.User) 
 // GetByUsername Implements [UserRepository.GetByUsername]
 func (r *userRepositoryImpl) GetByUsername(ctx context.Context, username string) (*userEntity.User, error) {
 	var user userEntity.User
-	err := r.db.WithContext(ctx).Where("username = ?", username).First(&user).Error
+	err := r.db.WithContext(ctx).Where(&userEntity.User{Username: username}).First(&user).Error
 	if err != nil {
 		return nil, err
 	}

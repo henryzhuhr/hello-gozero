@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/avast/retry-go/v4 v4.7.0
+	github.com/go-sql-driver/mysql v1.9.0
 	github.com/google/uuid v1.6.0
 	github.com/redis/go-redis/v9 v9.17.2
 	github.com/segmentio/kafka-go v0.4.49
@@ -23,7 +24,6 @@ require (
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-sql-driver/mysql v1.9.0 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/grafana/pyroscope-go v1.2.7 // indirect
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.9 // indirect
