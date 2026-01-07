@@ -43,3 +43,8 @@ Infra:
       - kafka-broker:9092
     Topic: hello-gozero-topic
     Group: hello-gozero-group
+
+# Pprof 性能分析配置
+Pprof:
+  Enabled: true  # 是否启用 pprof，生产环境建议设为 false
+  Port: 6060     # pprof 服务端口

@@ -5,6 +5,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof" // 导入 pprof
 	"os"
 	"os/signal"
 	"syscall"
@@ -40,36 +42,40 @@ func main() {
 	}
 	defer svcCtx.Close()
 
-	// 创建后台任务管理器
-	workerManager := setupWorkers(svcCtx)
+	// ========== 按顺序启动各个组件 ==========
 
-	// 创建用于控制 worker 的 context
-	workerCtx, cancelWorkers := context.WithCancel(context.Background())
-	defer cancelWorkers()
-
-	// 启动后台任务
-	if err := workerManager.Start(workerCtx); err != nil {
-		fmt.Printf("failed to start workers: %v\n", err)
+	// 1. 启动 pprof 性能分析服务
+	fmt.Println("📍 [1/3] Starting pprof server...")
+	fmt.Println("📍 [1/3] 启动 pprof 服务...")
+	if err := startPprofServer(c.Pprof); err != nil {
+		fmt.Printf("❌ Failed to start pprof: %v\n", err)
 		return
 	}
+
+	// 2. 启动后台 Worker 任务
+	fmt.Println("📍 [2/3] Starting background workers...")
+	fmt.Println("📍 [2/3] 启动后台任务...")
+	cancelWorkers, workerManager := startWorkers(svcCtx)
+	if workerManager == nil {
+		fmt.Println("❌ Failed to start workers")
+		return
+	}
+	defer cancelWorkers()
 	defer workerManager.Stop()
 
-	// 创建 HTTP 服务
-	server := rest.MustNewServer(c.RestConf)
+	// 3. 启动 GoZero HTTP 服务
+	fmt.Println("📍 [3/3] Starting HTTP server...")
+	fmt.Println("📍 [3/3] 启动 HTTP 服务...")
+	server, err := startHTTPServer(c, svcCtx)
+	if err != nil {
+		fmt.Printf("❌ Failed to start HTTP server: %v\n", err)
+		cancelWorkers()
+		workerManager.Stop()
+		return
+	}
 	defer server.Stop()
 
-	// 注册全局中间件
-	server.Use(middleware.NewUserAgentMiddleware().Handle)
-
-	// 注册路由
-	routes.RegisterHandlers(server, svcCtx)
-
-	// 启动 HTTP 服务（非阻塞）
-	go func() {
-		// 启动服务
-		fmt.Printf("🚀 Starting HTTP server at %s:%d...\n", c.Host, c.Port)
-		server.Start()
-	}()
+	fmt.Println("✅ All components started successfully!")
 
 	// 等待退出信号
 	quit := make(chan os.Signal, 1)
@@ -99,6 +105,87 @@ func main() {
 	default:
 		fmt.Println("✅ Server stopped successfully")
 	}
+}
+
+// startPprofServer 启动 pprof 性能分析服务
+func startPprofServer(pprofConf config.PprofConfig) error {
+	if !pprofConf.Enabled {
+		fmt.Println("   ⏭️  Pprof disabled, skipping...")
+		return nil
+	}
+
+	pprofAddr := fmt.Sprintf(":%d", pprofConf.Port)
+	go func() {
+		fmt.Printf("   ✅ Pprof server started at http://localhost%s/debug/pprof/\n", pprofAddr)
+		if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+			logx.Errorf("pprof server failed: %v", err)
+		}
+	}()
+	// 等待一小段时间确保服务启动
+	time.Sleep(100 * time.Millisecond)
+	return nil
+}
+
+// startWorkers 启动后台 Worker 任务
+func startWorkers(svcCtx *svc.ServiceContext) (context.CancelFunc, *worker.Manager) {
+	// 创建后台任务管理器
+	workerManager := setupWorkers(svcCtx)
+
+	// 创建用于控制 worker 的 context
+	workerCtx, cancelWorkers := context.WithCancel(context.Background())
+
+	// 启动后台任务
+	if err := workerManager.Start(workerCtx); err != nil {
+		fmt.Printf("   ❌ Failed to start workers: %v\n", err)
+		cancelWorkers()
+		return nil, nil
+	}
+
+	// 等待一小段时间确保 workers 完全启动
+	time.Sleep(100 * time.Millisecond)
+	fmt.Println("   ✅ All workers started successfully")
+
+	return cancelWorkers, workerManager
+}
+
+// startHTTPServer 启动 GoZero HTTP 服务
+func startHTTPServer(c config.Config, svcCtx *svc.ServiceContext) (*rest.Server, error) {
+	// 创建 HTTP 服务
+	server := rest.MustNewServer(c.RestConf)
+
+	// 注册全局中间件
+	server.Use(middleware.NewUserAgentMiddleware().Handle)
+
+	// 注册路由
+	routes.RegisterHandlers(server, svcCtx)
+
+	// 使用 channel 等待服务启动完成
+	started := make(chan error, 1)
+
+	// 启动 HTTP 服务（非阻塞）
+	go func() {
+		defer close(started)
+		server.Start()
+	}()
+
+	// 等待服务启动并验证
+	time.Sleep(200 * time.Millisecond)
+
+	// 健康检查：尝试连接服务端口
+	addr := fmt.Sprintf("%s:%d", c.Host, c.Port)
+	if c.Host == "" || c.Host == "0.0.0.0" {
+		addr = fmt.Sprintf("localhost:%d", c.Port)
+	}
+
+	healthURL := fmt.Sprintf("http://%s/health", addr)
+	resp, err := http.Get(healthURL)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP server health check failed: %w", err)
+	}
+	resp.Body.Close()
+
+	fmt.Printf("   ✅ HTTP server started at %s:%d (health check passed)\n", c.Host, c.Port)
+	return server, nil
 }
 
 // setupWorkers 配置并返回后台任务管理器
