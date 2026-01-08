@@ -30,9 +30,10 @@ func NewKafkaWriter(conf KafkaConfig) (*kafka.Writer, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// 发送一个合法的 JSON 测试消息
 	testMsg := kafka.Message{
 		Key:   []byte("test"),
-		Value: []byte("connection test"),
+		Value: []byte(`{"event_type":"connection_test","user_id":"00000000-0000-0000-0000-000000000000","data":{},"timestamp":0}`),
 	}
 
 	if err := writer.WriteMessages(ctx, testMsg); err != nil {

@@ -47,19 +47,19 @@ func NewUserEventHandler(
 
 // Handle Implements [MessageHandler.Handle]
 func (h *UserEventHandler) Handle(ctx context.Context, message kafka.Message) error {
-	// 每一个事件注入 trace_id 和其他元信息，方便日志追踪
-	// ctx = logx.ContextWithFields(ctx, logx.Field("trace_id", uuid.New().String()))
-
 	var event UserEvent
 	if err := json.Unmarshal(message.Value, &event); err != nil {
-		h.logger.Errorf("Failed to unmarshal user event: %v", err)
+		h.logger.WithContext(ctx).Errorf("Failed to unmarshal user event: %v, raw message: %s", err, string(message.Value))
 		return nil // 返回 nil 以提交 offset，避免重复消费无效消息
 	}
 
-	h.logger.WithContext(ctx).Infof("Processing user event: type=%s, user_id=%d", event.EventType, event.UserID)
+	h.logger.WithContext(ctx).Infof("Processing user event: type=%s, user_id=%s", event.EventType, event.UserID)
 
 	// 根据事件类型处理不同的业务逻辑
 	switch event.EventType {
+	case "connection_test":
+		h.logger.WithContext(ctx).Info("Kafka connection test message received")
+		return nil
 	case "user_registered":
 		return h.handleUserRegistered(ctx, event)
 	case "user_updated":
@@ -67,7 +67,7 @@ func (h *UserEventHandler) Handle(ctx context.Context, message kafka.Message) er
 	case "user_deleted":
 		return h.handleUserDeleted(ctx, event)
 	default:
-		h.logger.Infof("Unknown event type: %s", event.EventType)
+		h.logger.WithContext(ctx).Infof("Unknown event type: %s", event.EventType)
 		return nil
 	}
 }

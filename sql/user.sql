@@ -8,14 +8,16 @@ DROP TABLE IF EXISTS `t_user`;
 -- 仅当表不存在时创建（不会删除已有数据！）
 CREATE TABLE `t_user` (
   `id` BINARY(16) NOT NULL PRIMARY KEY COMMENT '用户ID (UUID，二进制存储)',
-  `username` VARCHAR(50) NOT NULL COMMENT '用户名',
-  `password` VARCHAR(255) NOT NULL COMMENT '加密密码',
-  `email` VARCHAR(100) DEFAULT '' COMMENT '邮箱',
-  `phone_country_code` VARCHAR(6) NOT NULL COMMENT '手机号国际区号（例如：+86）',
-  `phone_number` VARCHAR(20) NOT NULL COMMENT '手机号',
-  `nickname` VARCHAR(50) DEFAULT '' COMMENT '昵称',
-  `status` TINYINT DEFAULT 1 COMMENT '状态：0-禁用，1-正常',
-  `last_login_time` DATETIME DEFAULT NULL COMMENT '最后登录时间',
+
+  `username`            VARCHAR(50)   NOT NULL      COMMENT '用户名',
+  `password`            VARCHAR(255)  NOT NULL      COMMENT '加密密码',
+  `email`               VARCHAR(100)  DEFAULT ''    COMMENT '邮箱',
+  `phone_country_code`  VARCHAR(6)    NOT NULL      COMMENT '手机号国际区号（例如：+86）',
+  `phone_number`        VARCHAR(20)   NOT NULL      COMMENT '手机号',
+  `nickname`            VARCHAR(50)   DEFAULT ''    COMMENT '昵称',
+  `status`              TINYINT       DEFAULT 1     COMMENT '状态：0-禁用，1-正常',
+  `last_login_time`     DATETIME      DEFAULT NULL  COMMENT '最后登录时间',
+  
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted_at` DATETIME DEFAULT NULL COMMENT '删除时间（软删除）'

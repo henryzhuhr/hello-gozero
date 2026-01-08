@@ -882,7 +882,7 @@ class TestGetUserPerformance(BaseTestWithCleanup):
                     logger.debug(f"已创建 {i + 1}/{bulk_count} 个用户")
 
         assert len(created_users) >= bulk_count * 0.8, (
-            f"用户创建成功率应该 >= 80% (由于可能的测试间干扰，从90%降低到80%)"
+            "用户创建成功率应该 >= 80% (由于可能的测试间干扰，从90%降低到80%)"
         )
         logger.info(f"成功创建 {len(created_users)} 个用户")
 

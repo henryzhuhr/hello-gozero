@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"hello-gozero/internal/worker"
 
+	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"github.com/zeromicro/go-zero/core/logx"
 )
@@ -47,6 +49,14 @@ func (w *KafkaConsumerWorker) Start(ctx context.Context) error {
 	w.logger.Infof("Kafka consumer worker [%s] started, topic: %s", w.name, w.reader.Config().Topic)
 
 	for {
+		// 为每一次接收到的事件注入 trace_id 和 span_id，方便日志追踪和分布式链路跟踪
+		traceID := strings.ReplaceAll(uuid.New().String(), "-", "")
+		spanID := strings.ReplaceAll(uuid.New().String(), "-", "")[:16] // 取前16位作为 span_id
+		ctx = logx.ContextWithFields(ctx,
+			logx.Field("trace_id", traceID),
+			logx.Field("span", spanID),
+		)
+
 		select {
 		case <-ctx.Done():
 			w.logger.Infof("Kafka consumer worker [%s] received shutdown signal", w.name)
@@ -101,7 +111,7 @@ func (w *KafkaConsumerWorker) Stop() error {
 func (w *KafkaConsumerWorker) processMessage(ctx context.Context, message kafka.Message) error {
 	startTime := time.Now()
 
-	w.logger.Infof("Processing message - Topic: %s, Partition: %d, Offset: %d, Key: %s",
+	w.logger.WithContext(ctx).Infof("Processing message - Topic: %s, Partition: %d, Offset: %d, Key: %s",
 		message.Topic, message.Partition, message.Offset, string(message.Key))
 
 	// 调用业务处理器
@@ -110,7 +120,7 @@ func (w *KafkaConsumerWorker) processMessage(ctx context.Context, message kafka.
 	}
 
 	duration := time.Since(startTime)
-	w.logger.Infof("Message processed successfully in %v - Offset: %d", duration, message.Offset)
+	w.logger.WithContext(ctx).Infof("Message processed successfully in %v - Offset: %d", duration, message.Offset)
 
 	return nil
 }
