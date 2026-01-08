@@ -10,12 +10,14 @@ import (
 	"hello-gozero/infra/queue"
 
 	"github.com/zeromicro/go-zero/rest"
+	"github.com/zeromicro/go-zero/zrpc"
 )
 
 type Config struct {
-	rest.RestConf
-	Infra Infra       `json:"Infra"`
-	Pprof PprofConfig `json:"Pprof,optional"`
+	rest.RestConf                  // 匿名嵌入
+	zrpc.RpcServerConf             // 匿名嵌入
+	Infra              Infra       `json:"Infra"`
+	Pprof              PprofConfig `json:"Pprof,optional"`
 }
 
 // PprofConfig pprof性能分析配置

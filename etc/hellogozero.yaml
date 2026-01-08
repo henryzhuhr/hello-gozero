@@ -1,7 +1,20 @@
+
+# 应用服务名称
 Name: hellogozero
+Timeout: 1000
+
+# HTTP 服务配置
 Host: 0.0.0.0
 Port: 8888
-Timeout: 1000
+
+# RPC 服务配置
+ListenOn: 0.0.0.0:8080  # 注意：RPC 用 ListenOn，REST 用 Host+Port
+Etcd:
+  Hosts:
+  - 127.0.0.1:2379
+  Key: demo.rpc
+
+# 全局日志配置
 Log:
   Level: debug
   Stat: false
