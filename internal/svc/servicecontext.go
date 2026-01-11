@@ -9,11 +9,11 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/gorm"
 
-	"hello-gozero/infra/cache"
-	"hello-gozero/infra/database"
-	"hello-gozero/infra/queue"
 	"hello-gozero/internal/config"
 	userRepo "hello-gozero/internal/repository/user"
+	"hello-gozero/pkg/infra/cache"
+	"hello-gozero/pkg/infra/database"
+	"hello-gozero/pkg/infra/queue"
 )
 
 type ServiceContext struct {

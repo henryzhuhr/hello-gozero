@@ -5,9 +5,9 @@
 package config
 
 import (
-	"hello-gozero/infra/cache"
-	"hello-gozero/infra/database"
-	"hello-gozero/infra/queue"
+	"hello-gozero/pkg/infra/cache"
+	"hello-gozero/pkg/infra/database"
+	"hello-gozero/pkg/infra/queue"
 
 	"github.com/zeromicro/go-zero/rest"
 )

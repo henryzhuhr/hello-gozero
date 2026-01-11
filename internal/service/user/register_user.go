@@ -13,12 +13,12 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
-	"hello-gozero/infra/cache"
 	userConstant "hello-gozero/internal/constant/user"
 	userDto "hello-gozero/internal/dto/user"
 	userEntity "hello-gozero/internal/entity/user"
 	userRepo "hello-gozero/internal/repository/user"
 	"hello-gozero/internal/svc"
+	"hello-gozero/pkg/infra/cache"
 )
 
 type RegisterUserService struct {

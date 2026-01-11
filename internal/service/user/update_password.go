@@ -9,10 +9,10 @@ import (
 	"github.com/zeromicro/go-zero/core/logx"
 	"golang.org/x/crypto/bcrypt"
 
-	"hello-gozero/infra/cache"
 	"hello-gozero/internal/dto/user"
 	"hello-gozero/internal/svc"
 	passwordUtil "hello-gozero/internal/utils/password"
+	"hello-gozero/pkg/infra/cache"
 )
 
 type UpdatePasswordService struct {

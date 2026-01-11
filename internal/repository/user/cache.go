@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	"hello-gozero/infra/cache"
 	"hello-gozero/internal/constant/infra"
 	userEntity "hello-gozero/internal/entity/user"
+	"hello-gozero/pkg/infra/cache"
 
 	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
