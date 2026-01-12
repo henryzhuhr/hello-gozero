@@ -3,21 +3,10 @@ package user
 import (
 	"fmt"
 	"regexp"
-	"strings"
 )
 
 // 邮箱正则（更严谨的版本，可根据需求调整）
 var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
-
-var invalidUsername = map[string]struct{}{
-	"admin":         {},
-	"root":          {},
-	"system":        {},
-	"support":       {},
-	"contact":       {},
-	"info":          {},
-	"administrator": {},
-}
 
 // RegisterUserReq 创建用户请求
 type RegisterUserReq struct {
@@ -54,7 +43,7 @@ func (e RegisterUserValidationError) ToMap() map[string]interface{} {
 
 func (u *RegisterUserReq) Validate() error {
 	// 用户名校验
-	if err := u.validateUsername(); err != nil {
+	if err := validateUsername(u.Username); err != nil {
 		return err
 	}
 
@@ -69,41 +58,6 @@ func (u *RegisterUserReq) Validate() error {
 	}
 
 	// 可继续添加其他字段...
-
-	return nil
-}
-
-// validateUsername 校验用户名是否合法
-//
-// 支持：
-//   - 非空
-//   - 黑名单校验（如 "admin", "root" 等）
-//   - 最小长度（如 3）
-//   - 格式校验（只允许字母、数字、下划线、点等）
-//
-// 不支持
-//   - 中文字符（根据需求可添加）
-//   - emoji（根据需求可添加）
-func (u *RegisterUserReq) validateUsername() error {
-	if u.Username == "" {
-		return RegisterUserValidationError{Field: "username", Code: "required"}
-	}
-	// 黑名单校验（统一转小写避免大小写绕过）
-	if _, exists := invalidUsername[strings.ToLower(u.Username)]; exists {
-		return RegisterUserValidationError{
-			Field: "username",
-			Code:  "reserved_username",
-			Value: u.Username,
-		}
-	}
-	if len(u.Username) < 3 {
-		return RegisterUserValidationError{Field: "username", Code: "too_short", Value: u.Username}
-	}
-	// 格式校验：只允许字母、数字、下划线、点（根据业务需求调整）
-	if !regexp.MustCompile(`^[a-zA-Z0-9_.]+$`).MatchString(u.Username) {
-		// return fmt.Errorf("username can only contain letters, numbers, underscores, and dots")
-		return RegisterUserValidationError{Field: "username", Code: "invalid_format", Value: u.Username}
-	}
 
 	return nil
 }

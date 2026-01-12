@@ -22,6 +22,12 @@ func GetUserListHandler(svcCtx *svc.ServiceContext) http.HandlerFunc {
 			return
 		}
 
+		// 验证请求参数
+		if err := req.Validate(); err != nil {
+			httpx.ErrorCtx(r.Context(), w, err)
+			return
+		}
+
 		l := userService.NewGetUserListService(r.Context(), svcCtx)
 		resp, err := l.GetUserList(&req)
 		ctx := l.GetCtx() // 使用服务层的上下文以包含日志字段
