@@ -8,6 +8,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	UserStatusActive   = 1 // 用户状态：活跃
+	UserStatusDisabled = 0 // 用户状态：禁用
+)
+
 // User represents a user entity. Use GORM model definitions and tags as needed.
 type User struct {
 	ID []byte `gorm:"primaryKey;type:BINARY(16);not null"`

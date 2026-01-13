@@ -14,6 +14,7 @@ from test.helpers import (
     get_random_phone,
     get_random_str,
 )
+from test.helpers.database import DatabaseHelper
 from test.models import CommonResponse
 from test.performance_models import PerformanceConfig
 from test.user.helpers import User, create_mock_user
@@ -61,6 +62,25 @@ class UserRequest:
             f"/api/v1/users/{username}/password",
             data={"old_password": old_password, "new_password": new_password},
         )
+
+    @staticmethod
+    def get_user_list(
+        api_client: ApiClient, page: int, page_size: int
+    ) -> CommonResponse:
+        """获取用户列表"""
+        return api_client.get(
+            f"/api/v1/users/list?page={page}&page_size={page_size}",
+        )
+
+    @staticmethod
+    def get_user_count(
+        api_client: ApiClient, include_deleted: bool = False
+    ) -> CommonResponse:
+        """获取用户总数统计"""
+        url = "/api/v1/users/count"
+        if include_deleted:
+            url += "?include_deleted=true"
+        return api_client.get(url)
 
 
 def test_00_placeholder():
@@ -1170,3 +1190,411 @@ class TestUpdatePassword(BaseTestWithCleanup):
         logger.success(
             f"✓ 并发更新密码测试通过（成功: {success_count}, 失败: {failed_count}）"
         )
+
+
+class TestGetUserList(BaseTestWithCleanup):
+    """获取用户列表接口测试类"""
+
+    def test_get_user_list_pagination(
+        self,
+        go_server: subprocess.Popen,
+        api_client: ApiClient,
+        db_helper: DatabaseHelper,
+    ):
+        """测试用户列表的分页功能"""
+        # 清空用户表，确保测试环境干净
+        db_helper.truncate_table("t_user")
+        logger.info("已清空用户表，开始测试分页功能")
+
+        # 1. 创建多个用户（减少到 25 个，测试更快）
+        total_users = 25
+        created_usernames = []
+        for _ in range(total_users):
+            user = create_mock_user()
+            response = UserRequest.create_user(api_client, user)
+            if response.status_code == 200:
+                created_usernames.append(user.username)
+
+        logger.info(f"成功创建 {len(created_usernames)} 个用户")
+
+        # 2. 测试分页查询
+        page_size = 10
+        total_pages = (len(created_usernames) + page_size - 1) // page_size
+
+        for page in range(1, total_pages + 1):
+            logger.info(f"查询用户列表，第 {page} 页，页面大小 {page_size}")
+            response = UserRequest.get_user_list(
+                api_client, page=page, page_size=page_size
+            )
+
+            assert response.status_code == 200, (
+                f"获取用户列表失败: {response.status_code}"
+            )
+
+            resp_data = response.data
+            if isinstance(resp_data, dict):
+                users = resp_data.get("list", [])
+                total = resp_data.get("total", 0)
+            else:
+                users = []
+                total = 0
+
+            expected_count = (
+                page_size
+                if page < total_pages
+                else len(created_usernames) - page_size * (total_pages - 1)
+            )
+
+            assert total == len(users), (
+                f"返回的总数不正确，期望 {len(users)}，实际 {total}"
+            )
+            assert len(users) == expected_count, (
+                f"第 {page} 页用户数量不正确，期望 {expected_count}，实际 {len(users)}"
+            )
+
+            logger.success(f"✓ 第 {page} 页用户列表查询通过，用户数: {len(users)}")
+
+    def test_get_user_list_empty(
+        self,
+        go_server: subprocess.Popen,
+        api_client: ApiClient,
+        db_helper: DatabaseHelper,
+    ):
+        """测试空用户列表"""
+        # 确保数据库为空
+        db_helper.truncate_table("t_user")
+
+        response = UserRequest.get_user_list(api_client, page=1, page_size=10)
+        assert response.status_code == 200, f"获取空列表失败: {response.status_code}"
+
+        resp_data = response.data
+        if isinstance(resp_data, dict):
+            users = resp_data.get("list", [])
+            total = resp_data.get("total", -1)
+        else:
+            users = []
+            total = -1
+
+        assert len(users) == 0, f"空列表应该返回0个用户，实际: {len(users)}"
+        assert total == 0, f"空列表总数应该为0，实际: {total}"
+        logger.success("✓ 空用户列表测试通过")
+
+    def test_get_user_list_boundary_conditions(
+        self,
+        go_server: subprocess.Popen,
+        api_client: ApiClient,
+        db_helper: DatabaseHelper,
+    ):
+        """测试边界条件（无效的页码和页面大小）"""
+        db_helper.truncate_table("t_user")
+
+        # 创建几个用户
+        for _ in range(5):
+            user = create_mock_user()
+            UserRequest.create_user(api_client, user)
+
+        # page = 0 和 page_size = 0 会自动填充默认值，属于成功
+        # 测试 page = 0
+        response = UserRequest.get_user_list(api_client, page=0, page_size=10)
+        assert response.status_code == 200, (
+            f"页码为0应该返回默认第一页，实际: {response.status_code}"
+        )
+
+        # 测试 page_size = 0
+        response = UserRequest.get_user_list(api_client, page=1, page_size=0)
+        assert response.status_code == 200, (
+            f"页面大小为0应该返回默认大小，实际: {response.status_code}"
+        )
+
+        # 测试超大页码（超出范围）
+        response = UserRequest.get_user_list(api_client, page=9999, page_size=10)
+        assert response.status_code == 200, (
+            f"超出范围的页码应该返回空列表，实际: {response.status_code}"
+        )
+        resp_data = response.data
+        if isinstance(resp_data, dict):
+            users = resp_data.get("list", [])
+            assert len(users) == 0, "超出范围应该返回空列表"
+
+        # 测试最大页面大小（根据配置限制）
+        response = UserRequest.get_user_list(api_client, page=1, page_size=100)
+        assert response.status_code == 200, (
+            f"最大页面大小应该被接受，实际: {response.status_code}"
+        )
+
+        # 测试超过最大页面大小，接口会自动约束在 100
+        response = UserRequest.get_user_list(api_client, page=1, page_size=101)
+        assert response.status_code == 200, (
+            f"超过最大页面大小应该返回错误，实际: {response.status_code}"
+        )
+
+        logger.success("✓ 边界条件测试通过")
+
+    def test_get_user_list_with_deleted_users(
+        self,
+        go_server: subprocess.Popen,
+        api_client: ApiClient,
+        db_helper: DatabaseHelper,
+    ):
+        """测试列表不包含已删除的用户（软删除）"""
+        db_helper.truncate_table("t_user")
+
+        # 创建5个用户
+        users = []
+        for _ in range(5):
+            user = create_mock_user()
+            response = UserRequest.create_user(api_client, user)
+            if response.status_code == 200:
+                users.append(user)
+
+        # 删除其中2个用户（软删除）
+        for i in range(2):
+            UserRequest.delete_user(api_client, users[i].username)
+
+        # 查询用户列表
+        response = UserRequest.get_user_list(api_client, page=1, page_size=10)
+        assert response.status_code == 200
+
+        resp_data = response.data
+        if isinstance(resp_data, dict):
+            active_users = resp_data.get("list", [])
+            total = resp_data.get("total", 0)
+        else:
+            active_users = []
+            total = 0
+
+        # 应该只返回未删除的用户
+        assert len(active_users) == 3, f"应该返回3个活跃用户，实际: {len(active_users)}"
+        assert total == 3, f"总数应该为3，实际: {total}"
+
+        # 验证返回的用户不包含已删除的
+        returned_usernames = [u.get("username") for u in active_users]
+        for i in range(2):
+            assert users[i].username not in returned_usernames, (
+                f"已删除用户 {users[i].username} 不应该在列表中"
+            )
+
+        logger.success("✓ 软删除用户过滤测试通过")
+
+    def test_get_user_list_data_integrity(
+        self, go_server: subprocess.Popen, api_client: ApiClient, db_helper
+    ):
+        """测试列表返回数据的完整性和正确性"""
+        db_helper.truncate_table("t_user")
+
+        # 创建一个用户并记录详细信息
+        test_user = create_mock_user()
+        create_response = UserRequest.create_user(api_client, test_user)
+        assert create_response.status_code == 200
+
+        # 获取列表
+        response = UserRequest.get_user_list(api_client, page=1, page_size=10)
+        assert response.status_code == 200
+
+        resp_data = response.data
+        if isinstance(resp_data, dict):
+            users = resp_data.get("list", [])
+        else:
+            users = []
+
+        assert len(users) == 1, "应该返回1个用户"
+
+        # 验证用户数据完整性
+        returned_user = users[0]
+        assert returned_user.get("username") == test_user.username, "用户名不匹配"
+        assert returned_user.get("email") == test_user.email, "邮箱不匹配"
+        assert returned_user.get("nickname") == test_user.nickname, "昵称不匹配"
+        assert "password" not in returned_user, "密码不应该被返回"
+
+        # 验证应该有的字段
+        expected_fields = ["username", "email", "nickname", "status"]
+        for field in expected_fields:
+            assert field in returned_user, f"缺少字段: {field}"
+
+        logger.success("✓ 数据完整性测试通过")
+
+
+class TestGetUserCount(BaseTestWithCleanup):
+    """获取用户总数统计测试类"""
+
+    # TEST_ERROR_TOTAL=-1
+
+    def test_get_user_count_basic(
+        self, go_server: subprocess.Popen, api_client: ApiClient, db_helper
+    ):
+        """测试基本的用户统计功能"""
+        # 清空数据库
+        db_helper.truncate_table("t_user")
+
+        # 创建5个用户
+        for _ in range(5):
+            user = create_mock_user()
+            response = UserRequest.create_user(api_client, user)
+            assert response.status_code == 200
+
+        # 获取用户总数
+        response = UserRequest.get_user_count(api_client)
+        assert response.status_code == 200, f"获取用户总数失败: {response.status_code}"
+
+        resp_data = response.data
+        assert isinstance(resp_data, dict), "响应数据应该是字典"
+
+        total = resp_data.get("total", 0)
+        active = resp_data.get("active", 0)
+
+        assert total == 5, f"总数应该为5，实际: {total}"
+        assert active == 5, f"活跃用户数应该为5，实际: {active}"
+
+        logger.success("✓ 基本用户统计测试通过")
+
+    def test_get_user_count_with_deleted(
+        self, go_server: subprocess.Popen, api_client: ApiClient, db_helper
+    ):
+        """测试包含已删除用户的统计"""
+        # 清空数据库
+        db_helper.truncate_table("t_user")
+
+        # 创建5个用户
+        users = []
+        for _ in range(5):
+            user = create_mock_user()
+            response = UserRequest.create_user(api_client, user)
+            if response.status_code == 200:
+                users.append(user)
+
+        # 删除其中2个用户（软删除）
+        for i in range(2):
+            UserRequest.delete_user(api_client, users[i].username)
+
+        # 获取用户统计（不包含已删除）
+        response = UserRequest.get_user_count(api_client, include_deleted=False)
+        assert response.status_code == 200
+
+        resp_data = response.data
+        if isinstance(resp_data, dict):
+            total = resp_data.get("total", 0)
+            active = resp_data.get("active", 0)
+        else:
+            total = 0
+            active = 0
+
+        assert total == 3, f"总数应该为3（不含已删除），实际: {total}"
+        assert active == 3, f"活跃用户数应该为3，实际: {active}"
+
+        # 获取用户统计（包含已删除）
+        response = UserRequest.get_user_count(api_client, include_deleted=True)
+        assert response.status_code == 200
+
+        resp_data = response.data
+        if isinstance(resp_data, dict):
+            total = resp_data.get("total", 0)
+            active = resp_data.get("active", 0)
+            deleted = resp_data.get("deleted", 0)
+        else:
+            total = 0
+            active = 0
+            deleted = 0
+
+        assert total == 5, f"总数应该为5（含已删除），实际: {total}"
+        assert active == 3, f"活跃用户数应该为3，实际: {active}"
+        assert deleted == 2, f"已删除用户数应该为2，实际: {deleted}"
+
+        logger.success("✓ 包含已删除用户的统计测试通过")
+
+    def test_get_user_count_empty_database(
+        self, go_server: subprocess.Popen, api_client: ApiClient, db_helper
+    ):
+        """测试空数据库的统计"""
+        # 确保数据库为空
+        db_helper.truncate_table("t_user")
+
+        # 获取用户总数
+        response = UserRequest.get_user_count(api_client)
+        assert response.status_code == 200
+
+        resp_data = response.data
+        if isinstance(resp_data, dict):
+            total = resp_data.get("total", -1)
+            active = resp_data.get("active", -1)
+        else:
+            total = -1
+            active = -1
+
+        assert total == 0, f"空数据库总数应该为0，实际: {total}"
+        assert active == 0, f"空数据库活跃用户数应该为0，实际: {active}"
+
+        logger.success("✓ 空数据库统计测试通过")
+
+    def test_get_user_count_consistency_with_list(
+        self, go_server: subprocess.Popen, api_client: ApiClient, db_helper
+    ):
+        """测试统计数据与列表数据的一致性"""
+        # 清空数据库
+        db_helper.truncate_table("t_user")
+
+        # 创建10个用户
+        created_count = 0
+        for _ in range(10):
+            user = create_mock_user()
+            response = UserRequest.create_user(api_client, user)
+            if response.status_code == 200:
+                created_count += 1
+
+        # 获取用户总数
+        count_response = UserRequest.get_user_count(api_client)
+        assert count_response.status_code == 200
+
+        count_data = count_response.data
+        count_total = count_data.get("total", 0)
+
+        # 获取用户列表
+        list_response = UserRequest.get_user_list(api_client, page=1, page_size=100)
+        assert list_response.status_code == 200
+
+        list_data = list_response.data
+        if isinstance(list_data, dict):
+            list_total = list_data.get("total", 0)
+            users = list_data.get("list", [])
+        else:
+            list_total = 0
+            users = []
+
+        # 验证一致性
+        assert count_total == list_total, (
+            f"统计接口的总数({count_total})应该与列表接口的总数({list_total})一致"
+        )
+        assert count_total == len(users), (
+            f"统计的总数({count_total})应该与实际用户数({len(users)})一致"
+        )
+        assert count_total == created_count, (
+            f"统计的总数({count_total})应该与创建的用户数({created_count})一致"
+        )
+
+        logger.success("✓ 统计数据一致性测试通过")
+
+    def test_get_user_count_with_database_verification(
+        self, go_server: subprocess.Popen, api_client: ApiClient, db_helper
+    ):
+        """测试统计数据与数据库实际数据的一致性"""
+        # 清空数据库
+        db_helper.truncate_table("t_user")
+
+        # 创建用户
+        for _ in range(7):
+            user = create_mock_user()
+            UserRequest.create_user(api_client, user)
+
+        # 从 API 获取统计
+        response = UserRequest.get_user_count(api_client)
+        assert response.status_code == 200
+
+        api_count = response.data.get("total", 0)
+
+        # 从数据库直接查询
+        db_count = db_helper.get_active_user_count()
+
+        assert api_count == db_count, (
+            f"API 返回的统计({api_count})应该与数据库实际数量({db_count})一致"
+        )
+
+        logger.success("✓ 与数据库数据一致性测试通过")

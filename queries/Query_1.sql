@@ -1,0 +1,1 @@
+DELETE FROM t_user Where status=1;

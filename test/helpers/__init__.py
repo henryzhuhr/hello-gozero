@@ -8,12 +8,14 @@
 - 从 generators 导出随机数据生成器
 - 从 base 导出测试基类
 - 从 client 导出 API 客户端
+- 从 database 导出数据库辅助类
 - 保持向后兼容，原有的 import 语句无需修改
 """
 
 # 从子模块导出
 from test.helpers.base import BaseTestWithCleanup
 from test.helpers.client import ApiClient
+from test.helpers.database import DatabaseHelper
 from test.helpers.generators import get_random_phone, get_random_str
 
 # 定义公共接口
@@ -25,4 +27,6 @@ __all__ = [
     "BaseTestWithCleanup",
     # API 客户端
     "ApiClient",
+    # 数据库辅助类
+    "DatabaseHelper",
 ]

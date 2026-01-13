@@ -67,6 +67,14 @@ type UserRepository interface {
 
 	// List 分页获取用户列表，返回用户切片和总数
 	List(ctx context.Context, offset, limit int) ([]*userEntity.User, int64, error)
+	// ListWithStatus 分页获取用户列表，返回用户切片和总数
+	ListWithStatus(ctx context.Context, offset, limit, status int) ([]*userEntity.User, int64, error)
+
+	// Count 获取用户总数（包含软删除）
+	Count(ctx context.Context) (int64, error)
+
+	// CountWithStatus 获取指定昨天的用户
+	CountWithStatus(ctx context.Context, status int) (int64, error)
 }
 
 type userRepositoryImpl struct {
@@ -191,4 +199,40 @@ func (r *userRepositoryImpl) List(ctx context.Context, offset, limit int) ([]*us
 	}
 
 	return users, total, nil
+}
+
+// ListWithStatus Implements [UserRepository.ListWithStatus]
+func (r *userRepositoryImpl) ListWithStatus(ctx context.Context, offset, limit, status int) ([]*userEntity.User, int64, error) {
+	users := make([]*userEntity.User, 0)
+	var total int64
+
+	// Get total count
+	if err := r.db.WithContext(ctx).Model(&userEntity.User{}).Where(&userEntity.User{Status: int8(status)}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
+	if err := r.db.WithContext(ctx).Where(&userEntity.User{Status: int8(status)}).Offset(offset).Limit(limit).Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return users, total, nil
+}
+
+// Count Implements [UserRepository.Count]
+// 获取用户总数（包含软删除的用户）
+func (r *userRepositoryImpl) Count(ctx context.Context) (int64, error) {
+	var count int64
+	// Unscoped() 会包含软删除的记录
+	err := r.db.WithContext(ctx).Model(&userEntity.User{}).Unscoped().Count(&count).Error
+	return count, err
+}
+
+// CountWithStatus Implements [UserRepository.CountWithStatus]
+// 获取活跃用户数（不包含软删除的用户）
+func (r *userRepositoryImpl) CountWithStatus(ctx context.Context, status int) (int64, error) {
+	var count int64
+	// 默认不包含软删除的记录
+	err := r.db.WithContext(ctx).Model(&userEntity.User{}).Where(&userEntity.User{Status: int8(status)}).Count(&count).Error
+	return count, err
 }

@@ -18,7 +18,7 @@ database:
   port: 3306
   user: "root"
   password: "rootpassword"
-  database: "hello_gozero"
+  database: "hello_gozero_db"
   charset: "utf8mb4"
 
 # Redis 配置(可选)

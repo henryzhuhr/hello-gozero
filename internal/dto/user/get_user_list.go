@@ -1,5 +1,7 @@
 package user
 
+import "hello-gozero/internal/entity/user"
+
 const (
 	getUserListMinPageNum  = 1   // 最小页码
 	getUserListMaxPageNum  = 100 // 最大页码
@@ -13,15 +15,15 @@ type GetUserListReq struct {
 	Page int `form:"page,default=1"`
 
 	// 每页大小/limit: 表示每一页包含多少条记录
-	PageSize int `form:"pageSize,default=10"`
+	PageSize int `form:"page_size,default=10"`
 
 	// 可选的过滤条件：用户状态
-	Status int `form:"status,optional"`
+	Status *int `form:"status,optional"`
 }
 
 // GetUserListResp 获取用户列表响应结果
 type GetUserListResp struct {
-	Total int64  `json:"total"`
+	Total int    `json:"total"`
 	List  []User `json:"list"`
 }
 
@@ -41,6 +43,11 @@ func (r *GetUserListReq) Validate() error {
 	}
 	if r.PageSize > getUserListMaxPageSize {
 		r.PageSize = getUserListMaxPageSize
+	}
+
+	if r.Status == nil {
+		r.Status = new(int)
+		*r.Status = user.UserStatusActive
 	}
 	return nil
 }

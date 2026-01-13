@@ -75,8 +75,14 @@ func (r *userRouter) addBatchUserInformationManagement() {
 			{
 				// 获取用户列表
 				Method:  http.MethodGet,
-				Path:    "/users",
+				Path:    "/users/list",
 				Handler: user.GetUserListHandler(r.serverCtx),
+			},
+			{
+				// 获取用户总数统计
+				Method:  http.MethodGet,
+				Path:    "/users/count",
+				Handler: user.GetUserCountHandler(r.serverCtx),
 			},
 		},
 		rest.WithPrefix("/api/v1"),

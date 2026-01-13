@@ -183,3 +183,39 @@ def perf_config(test_config: TestConfig):
     从 test_config 中提取性能配置，方便现有测试使用
     """
     return test_config.performance
+
+
+@pytest.fixture(scope="function")
+def db_helper(test_config: TestConfig):
+    """数据库辅助工具
+
+    提供数据库连接和清理功能
+    每个测试函数结束后自动关闭连接
+
+    示例用法：
+        def test_something(db_helper):
+            # 清空用户表
+            db_helper.clear_user_table()
+
+            # 查询数据
+            users = db_helper.query("SELECT * FROM t_user")
+
+            # 获取用户数量
+            count = db_helper.get_user_count()
+    """
+    from test.helpers import DatabaseHelper
+
+    db_config = test_config.database
+    helper = DatabaseHelper(
+        host=db_config.host,
+        port=db_config.port,
+        user=db_config.user,
+        password=db_config.password,
+        database=db_config.database,
+        charset=db_config.charset,
+    )
+
+    yield helper
+
+    # 测试结束后关闭连接
+    helper.close()
