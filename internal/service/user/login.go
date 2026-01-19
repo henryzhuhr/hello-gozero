@@ -3,8 +3,10 @@ package user
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/zeromicro/go-zero/core/logx"
+	"golang.org/x/crypto/bcrypt"
 
 	userDto "hello-gozero/internal/dto/user"
 	"hello-gozero/internal/svc"
@@ -33,5 +35,23 @@ func (l *LoginService) Login(req *userDto.LoginReq) (resp *userDto.LoginResp, er
 	if req == nil || req.Username == "" {
 		return nil, ErrMissingUsername
 	}
-	return &userDto.LoginResp{}, nil
+
+	// 加密密码（在事务外处理，避免事务过长）
+	hashedPasswordBytes, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %v", err)
+	}
+	hashedPassword := string(hashedPasswordBytes)
+
+	user, err := l.svcCtx.Repository.User.GetByUsername(l.ctx, req.Username)
+	if err != nil {
+		return nil, err
+	}
+	if user.Password != hashedPassword {
+		return nil, ErrInvalidCredentials
+	}
+
+	return &userDto.LoginResp{
+		
+	}, nil
 }

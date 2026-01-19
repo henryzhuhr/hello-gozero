@@ -80,6 +80,13 @@ func (s AuthFlowStatus) IsValid() bool {
 	}
 }
 
+type MFAMethod string
+
+const (
+	MFAMethodSMS   MFAMethod = "sms"
+	MFAMethodEmail MFAMethod = "email"
+)
+
 // LoginReq 登录请求体
 type LoginReq struct {
 	// 用户名，路径参数
@@ -101,9 +108,18 @@ type LoginResp struct {
 	// 应为一次性、短期有效的随机字符串（如 UUID + 时间戳签名）
 	MFAToken string `json:"mfa_token"`
 
+	// 当前选中的方式
+	CurrentMethod MFAMethod `json:"mfa_method"`
+
 	// MFA 令牌过期时间，单位：分钟
 	MFATokenExpiredTime int `json:"mfa_token_expired_time"`
 
 	// 脱敏后的手机号，用于前端提示“验证码已发送至... +86 131****1111”
 	MaskedPhone string `json:"masked_phone"`
+
+	// 脱敏后的值，例如 "+86****1234" 或 "a***@example.com"，用于前端提示“验证码已发送至... +86 131****1111”
+	MaskedValue string `json:"masked_value"`
+
+	// 可用的 MFA 方式列表["sms", "email"]
+	AvailableMethods []MFAMethod `json:"available_methods"`
 }

@@ -34,4 +34,6 @@ var (
 
 	// 新旧密码相同
 	ErrNewPasswordSameAsOld = errors.New("new password cannot be the same as the old password")
+
+	ErrInvalidCredentials = errors.New("invalid username or password")
 )
