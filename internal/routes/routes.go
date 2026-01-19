@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	hello "hello-gozero/internal/handler/hello"
+	"hello-gozero/internal/routes/user"
 	"hello-gozero/internal/svc"
 
 	"github.com/zeromicro/go-zero/rest"
@@ -14,7 +15,7 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	registerGlobalHandlers(server, serverCtx)
 
 	// 注册用户相关路由
-	userRouter := NewUserRouter(server, serverCtx)
+	userRouter := user.NewUserRouter(server, serverCtx)
 	userRouter.Register()
 }
 

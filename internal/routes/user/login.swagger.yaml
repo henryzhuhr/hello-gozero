@@ -1,0 +1,196 @@
+openapi: 3.0.3
+info:
+  title: 多因素认证（MFA）登录 API
+  version: 1.0.0
+  description: 基于用户名/密码 + 短信验证码的两阶段登录流程
+servers:
+  - url: https://api.example.com/v1
+    description: 生产环境
+
+paths:
+  /auth/login:
+    post:
+      summary: 第一阶段：账号密码验证（触发 MFA）
+      description: 验证用户名和密码。若成功且用户启用了 MFA，则返回临时 mfa_token 并触发短信发送。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 密码正确，需要完成 MFA
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MfaRequiredResponse'
+        '401':
+          description: 用户名或密码错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 账户被锁定、未激活或其它禁止登录原因
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/mfa/verify:
+    post:
+      summary: 第二阶段：验证短信验证码（完成 MFA）
+      description: 使用临时 mfa_token 和短信验证码完成二次验证，成功后颁发访问令牌。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaVerifyRequest'
+      responses:
+        '200':
+          description: MFA 验证成功，返回访问令牌
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: 请求参数错误（如验证码格式不合法）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: mfa_token 无效或已过期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: 验证码错误或尝试次数超限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/mfa/resend:
+    post:
+      summary: 重新发送短信验证码
+      description: 在 mfa_token 有效期内重新发送验证码（需防刷）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MfaResendRequest'
+      responses:
+        '200':
+          description: 验证码已重新发送
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: SMS resent successfully.
+        '400':
+          description: mfa_token 缺失或格式错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: 操作过于频繁，请稍后再试
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: user123
+        password:
+          type: string
+          format: password
+          example: mySecretPass!2026
+
+    MfaRequiredResponse:
+      type: object
+      required:
+        - status
+        - mfa_token
+      properties:
+        status:
+          type: string
+          enum: [mfa_required]
+          example: mfa_required
+        mfa_token:
+          type: string
+          description: 临时 MFA 会话令牌，有效期通常为 5 分钟
+          example: temp_mfa_abc123xyz789
+        masked_phone:
+          type: string
+          description: 脱敏后的手机号，用于前端提示
+          example: "+86****1234"
+
+    MfaVerifyRequest:
+      type: object
+      required:
+        - mfa_token
+        - code
+      properties:
+        mfa_token:
+          type: string
+          example: temp_mfa_abc123xyz789
+        code:
+          type: string
+          pattern: '^[0-9]{6}$'
+          description: 6 位数字短信验证码
+          example: "123456"
+
+    MfaResendRequest:
+      type: object
+      required:
+        - mfa_token
+      properties:
+        mfa_token:
+          type: string
+          example: temp_mfa_abc123xyz789
+
+    TokenResponse:
+      type: object
+      required:
+        - access_token
+        - expires_in
+      properties:
+        access_token:
+          type: string
+          format: jwt
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxx
+        refresh_token:
+          type: string
+          example: rtk_refresh_xyz789
+        expires_in:
+          type: integer
+          description: Access token 过期时间（秒）
+          example: 3600
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid credentials
+        error_code:
+          type: string
+          example: AUTH_001

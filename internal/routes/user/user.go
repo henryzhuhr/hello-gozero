@@ -1,5 +1,5 @@
-// Package routes 用户相关路由注册
-package routes
+// Package user 用户相关路由注册
+package user
 
 import (
 	"net/http"
@@ -28,6 +28,11 @@ func (r *userRouter) Register() {
 	r.addUserInformationManagement()      // 用户信息管理
 	r.addBatchUserInformationManagement() // 用户批量管理
 	r.addPasswordManagement()             // 密码管理
+
+	// 认证 / Authentication 接口组
+	r.addAuthenticationRoutes()
+
+	// 鉴权 / Authorization  接口组
 }
 
 // addRegisterUser 用户注册
@@ -134,6 +139,28 @@ func (r *userRouter) addPasswordManagement() {
 				Method:  http.MethodPost,
 				Path:    "/users/password/reset/verify",
 				Handler: user.VerifyResetPasswordTokenHandler(r.serverCtx),
+			},
+		},
+		rest.WithPrefix("/api/v1"),
+	)
+}
+
+// addAuthenticationRoutes 认证 / Authentication  接口组
+func (r *userRouter) addAuthenticationRoutes() {
+	// v1 接口组
+	r.server.AddRoutes(
+		[]rest.Route{
+			{
+				// 用户登录
+				Method:  http.MethodPost,
+				Path:    "/auth/login",
+				Handler: user.LoginHandler(r.serverCtx),
+			},
+			{
+				// MFA 验证
+				Method:  http.MethodPost,
+				Path:    "/auth/mfa/verify",
+				Handler: user.MFAVerifyHandler(r.serverCtx),
 			},
 		},
 		rest.WithPrefix("/api/v1"),
