@@ -2,7 +2,7 @@
 USE hello_gozero_db;
 
 -- 删除表（如果存在）
-DROP TABLE IF EXISTS `t_user`;
+-- DROP TABLE IF EXISTS `t_user`;
 
 -- DDL 是 Data Definition Language（数据定义语言）的缩写，是 SQL 语言的一个子集，用于定义或修改数据库结构（schema），而不是操作表中的数据。
 -- 仅当表不存在时创建（不会删除已有数据！）

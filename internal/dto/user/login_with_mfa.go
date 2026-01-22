@@ -114,9 +114,6 @@ type LoginResp struct {
 	// MFA 令牌过期时间，单位：分钟
 	MFATokenExpiredTime int `json:"mfa_token_expired_time"`
 
-	// 脱敏后的手机号，用于前端提示“验证码已发送至... +86 131****1111”
-	MaskedPhone string `json:"masked_phone"`
-
 	// 脱敏后的值，例如 "+86****1234" 或 "a***@example.com"，用于前端提示“验证码已发送至... +86 131****1111”
 	MaskedValue string `json:"masked_value"`
 
