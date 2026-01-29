@@ -11,9 +11,11 @@ import (
 
 	"hello-gozero/internal/config"
 	userRepo "hello-gozero/internal/repository/user"
+
 	"hello-gozero/pkg/infra/cache"
 	"hello-gozero/pkg/infra/database"
 	"hello-gozero/pkg/infra/queue"
+	"hello-gozero/pkg/locale"
 )
 
 type ServiceContext struct {
@@ -57,6 +59,11 @@ func NewServiceContext(c config.Config) (*ServiceContext, error) {
 	ctx := context.Background()
 	// 初始化日志
 	logger := logx.WithContext(ctx)
+
+	// 加载国际化文件
+	if err := locale.LoadFromDir(c.LocaleDir); err != nil {
+		return nil, fmt.Errorf("failed to load i18n files: %w", err)
+	}
 
 	// 初始化 MySQL 连接
 	mysqlConn, err := database.NewMySQL(c.Infra.Mysql, logger)

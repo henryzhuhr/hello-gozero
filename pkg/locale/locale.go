@@ -1,4 +1,4 @@
-package i18n
+package locale
 
 import (
 	"context"
@@ -11,7 +11,7 @@ const (
 	LocaleZH Locale = "zh-CN"
 )
 
-const key = "i18n.locale.key"
+const key Locale = "i18n.locale.key"
 
 func SetLocale(ctx context.Context, locale string) context.Context {
 	return context.WithValue(ctx, key, locale)

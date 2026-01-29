@@ -24,7 +24,13 @@ type User struct {
 	PhoneNumber      string `gorm:"type:varchar(20);default:'';column:phone_number" json:"phone_number"`
 	Nickname         string `gorm:"type:varchar(50);default:'';column:nickname" json:"nickname"`
 
-	Status        int8       `gorm:"type:tinyint;default:1;column:status" json:"status"` // 0-禁用，1-正常
+	// 用户状态 0-禁用，1-正常
+	Status int8 `gorm:"type:tinyint;default:1;column:status" json:"status"`
+
+	// 是否启用了 MFA
+	MFAEnabled bool `gorm:"type:boolean;default:false;column:mfa_enabled" json:"mfa_enabled"`
+
+	// 最后登陆时间
 	LastLoginTime *time.Time `gorm:"column:last_login_time" json:"last_login_time,omitempty"`
 
 	CreatedAt time.Time      `gorm:"not null;default:CURRENT_TIMESTAMP;column:created_at" json:"created_at"`
@@ -34,7 +40,7 @@ type User struct {
 
 // TableName specifies the table name for the User model
 func (User) TableName() string {
-	return "t_user"
+	return "user"
 }
 
 // BeforeCreate GORM hook - generates UUID before creating a new user

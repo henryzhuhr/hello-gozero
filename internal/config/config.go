@@ -16,6 +16,8 @@ type Config struct {
 	rest.RestConf
 	Infra Infra       `json:"Infra"`
 	Pprof PprofConfig `json:"Pprof,optional"`
+
+	LocaleDir string `json:"LocaleDir,optional"` // 国际化资源文件目录
 }
 
 // PprofConfig pprof性能分析配置

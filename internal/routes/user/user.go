@@ -23,11 +23,11 @@ func NewUserRouter(server *rest.Server, serverCtx *svc.ServiceContext) *userRout
 }
 
 func (r *userRouter) Register() {
-	r.addRegisterUser()                   // 用户注册
+	// 用户管理 / User Management 接口组
+	r.addUserMangement()
 	r.addAccountStatusManagement()        // 账户状态管理
 	r.addUserInformationManagement()      // 用户信息管理
 	r.addBatchUserInformationManagement() // 用户批量管理
-	r.addPasswordManagement()             // 密码管理
 
 	// 认证 / Authentication 接口组
 	r.addAuthenticationRoutes()
@@ -35,10 +35,11 @@ func (r *userRouter) Register() {
 	// 鉴权 / Authorization  接口组
 }
 
-// addRegisterUser 用户注册
-//   - POST /api/v1/users/register - 注册用户
-func (r *userRouter) addRegisterUser() {
-	// v1 接口组
+// addUserMangement 用户管理 / User Management 接口组
+//   - POST /api/v1/users/register - 注册用户 【新增】
+func (r *userRouter) addUserMangement() {
+	// 注册 v1 接口组
+	// - POST /api/v1/users/register - 注册用户 【新增】
 	r.server.AddRoutes(
 		[]rest.Route{
 			{
@@ -46,6 +47,60 @@ func (r *userRouter) addRegisterUser() {
 				Method:  http.MethodPost,
 				Path:    "/users/register",
 				Handler: user.RegisterUserHandler(r.serverCtx),
+			},
+		},
+		rest.WithPrefix("/api/v1"),
+	)
+
+	// 密码管理 v1 接口组
+	// - `PUT /api/v1/users/:username/password` - 修改密码
+	// - `POST /api/v1/users/password/reset` - 重置密码（忘记密码）
+	// - `POST /api/v1/users/password/reset/verify` - 验证重置密码令牌
+	r.server.AddRoutes(
+		[]rest.Route{
+			{
+				// 修改密码
+				Method:  http.MethodPut,
+				Path:    "/users/:username/password",
+				Handler: user.UpdatePasswordHandler(r.serverCtx),
+			},
+			{
+				// 重置密码（忘记密码）
+				Method:  http.MethodPost,
+				Path:    "/users/password/reset",
+				Handler: user.ResetPasswordHandler(r.serverCtx),
+			},
+			{
+				// 验证重置密码令牌
+				Method:  http.MethodPost,
+				Path:    "/users/password/reset/verify",
+				Handler: user.VerifyResetPasswordTokenHandler(r.serverCtx),
+			},
+		},
+		rest.WithPrefix("/api/v1"),
+	)
+
+	// MFA 管理 v1 接口组
+	// v1 接口组
+	r.server.AddRoutes(
+		[]rest.Route{
+			{
+				// 新增 TOTP MFA 方法
+				Method:  http.MethodPost,
+				Path:    "/mfa/setup/totp",
+				Handler: nil, // TODO
+			},
+			{
+				// 新增 SMS MFA 方法
+				Method:  http.MethodPost,
+				Path:    "/mfa/setup/sms",
+				Handler: nil, // TODO
+			},
+			{
+				// MFA 验证
+				Method:  http.MethodPost,
+				Path:    "/mfa/verify",
+				Handler: user.MFAVerifyHandler(r.serverCtx),
 			},
 		},
 		rest.WithPrefix("/api/v1"),
@@ -114,37 +169,6 @@ func (r *userRouter) addAccountStatusManagement() {
 	)
 }
 
-// addPasswordManagement 密码管理
-// - `PUT /api/v1/users/:username/password` - 修改密码
-// - `POST /api/v1/users/password/reset` - 重置密码（忘记密码）
-// - `POST /api/v1/users/password/reset/verify` - 验证重置密码令牌
-func (r *userRouter) addPasswordManagement() {
-	// v1 接口组
-	r.server.AddRoutes(
-		[]rest.Route{
-			{
-				// 修改密码
-				Method:  http.MethodPut,
-				Path:    "/users/:username/password",
-				Handler: user.UpdatePasswordHandler(r.serverCtx),
-			},
-			{
-				// 重置密码（忘记密码）
-				Method:  http.MethodPost,
-				Path:    "/users/password/reset",
-				Handler: user.ResetPasswordHandler(r.serverCtx),
-			},
-			{
-				// 验证重置密码令牌
-				Method:  http.MethodPost,
-				Path:    "/users/password/reset/verify",
-				Handler: user.VerifyResetPasswordTokenHandler(r.serverCtx),
-			},
-		},
-		rest.WithPrefix("/api/v1"),
-	)
-}
-
 // addAuthenticationRoutes 认证 / Authentication  接口组
 func (r *userRouter) addAuthenticationRoutes() {
 	// v1 接口组
@@ -155,12 +179,6 @@ func (r *userRouter) addAuthenticationRoutes() {
 				Method:  http.MethodPost,
 				Path:    "/auth/login",
 				Handler: user.LoginHandler(r.serverCtx),
-			},
-			{
-				// MFA 验证
-				Method:  http.MethodPost,
-				Path:    "/auth/mfa/verify",
-				Handler: user.MFAVerifyHandler(r.serverCtx),
 			},
 		},
 		rest.WithPrefix("/api/v1"),

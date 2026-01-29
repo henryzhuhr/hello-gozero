@@ -1,0 +1,9 @@
+user.missing_username: "Missing username"
+user.not_found: "User not found"
+user.username_exists: "Username already exists"
+user.old_password_mismatch: "Old password does not match"
+user.new_password_same_as_old: "New password cannot be the same as the old password"
+user.weak_password: "Password is too weak, please choose a more complex password."
+
+
+auth.invalid_credentials: "Invalid username or password"

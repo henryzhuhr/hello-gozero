@@ -106,17 +106,17 @@ type LoginResp struct {
 
 	// 临时 MFA 会话标识（短期有效，如5分钟）
 	// 应为一次性、短期有效的随机字符串（如 UUID + 时间戳签名）
-	MFAToken string `json:"mfa_token"`
+	MFAToken string `json:"mfa_token,omitempty"`
 
 	// 当前选中的方式
-	CurrentMethod MFAMethod `json:"mfa_method"`
+	CurrentMethod MFAMethod `json:"mfa_method,omitempty"`
 
 	// MFA 令牌过期时间，单位：分钟
-	MFATokenExpiredTime int `json:"mfa_token_expired_time"`
+	MFATokenExpiredTime int `json:"mfa_token_expired_time,omitempty"`
 
 	// 脱敏后的值，例如 "+86****1234" 或 "a***@example.com"，用于前端提示“验证码已发送至... +86 131****1111”
-	MaskedValue string `json:"masked_value"`
+	MaskedValue string `json:"masked_value,omitempty"`
 
 	// 可用的 MFA 方式列表["sms", "email"]
-	AvailableMethods []MFAMethod `json:"available_methods"`
+	AvailableMethods []MFAMethod `json:"available_methods,omitempty"`
 }

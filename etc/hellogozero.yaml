@@ -7,6 +7,9 @@ Log:
   Stat: false
   Encoding: plain # plain 或 json
 
+LocaleDir: ./locales  # 国际化资源文件目录
+
+
 # 基础设施配置
 Infra:
   # MySQL 配置

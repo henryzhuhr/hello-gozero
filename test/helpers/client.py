@@ -19,7 +19,7 @@ from test.models import CommonResponse
 
 class ApiClient:
     """API 客户端，封装 HTTP 请求的公共逻辑
-    
+
     使用 requests.Session() 维护连接池，提高性能并正确管理连接生命周期
     """
 
@@ -198,7 +198,7 @@ class ApiClient:
 
     def close(self):
         """关闭 Session，释放连接池资源
-        
+
         在测试结束后应该调用此方法，避免连接泄漏
         """
         if self.session:

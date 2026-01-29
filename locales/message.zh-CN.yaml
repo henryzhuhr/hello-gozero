@@ -1,0 +1,9 @@
+user.missing_username: "用户名缺失"
+user.not_found: "用户未找到"
+user.username_exists: "用户名已存在"
+user.old_password_mismatch: "旧密码不匹配"
+user.new_password_same_as_old: "新密码不能与旧密码相同"
+user.weak_password: "密码过于简单，请选择更复杂的密码。"
+
+
+auth.invalid_credentials: "无效的用户名或密码"

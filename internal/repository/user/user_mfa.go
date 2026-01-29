@@ -36,10 +36,10 @@ type UserMFARepository interface {
 	Transaction(ctx context.Context, fn func(repo UserMFARepository) error) error
 
 	// Create 创建新用户 MFA 记录
-	Create(ctx context.Context, userMFA *userEntity.UserMFA) error
+	Create(ctx context.Context, userMFA *userEntity.MFAMethod) error
 
 	// GetByUserID 获取指定用户的所有 MFA 记录
-	GetByUserID(ctx context.Context, userID []byte) ([]*userEntity.UserMFA, error)
+	GetByUserID(ctx context.Context, userID []byte) ([]*userEntity.MFAMethod, error)
 }
 
 type userMFARepositoryImpl struct {
@@ -60,15 +60,15 @@ func (r *userMFARepositoryImpl) Transaction(ctx context.Context, fn func(repo Us
 }
 
 // Create implements [UserMFARepository.Create].
-func (r *userMFARepositoryImpl) Create(ctx context.Context, userMFA *userEntity.UserMFA) error {
+func (r *userMFARepositoryImpl) Create(ctx context.Context, userMFA *userEntity.MFAMethod) error {
 	return r.db.WithContext(ctx).Create(userMFA).Error
 }
 
 // GetByUserID implements [UserMFARepository.GetByUserID].
-func (r *userMFARepositoryImpl) GetByUserID(ctx context.Context, userID []byte) ([]*userEntity.UserMFA, error) {
-	var userMFAs []*userEntity.UserMFA
+func (r *userMFARepositoryImpl) GetByUserID(ctx context.Context, userID []byte) ([]*userEntity.MFAMethod, error) {
+	var userMFAs []*userEntity.MFAMethod
 	if err := r.db.WithContext(ctx).
-		Where(&userEntity.UserMFA{UserID: userID}).
+		Where(&userEntity.MFAMethod{UserID: userID}).
 		Find(&userMFAs).
 		Error; err != nil {
 		return nil, err
